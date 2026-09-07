@@ -284,6 +284,21 @@ task.spawn(function()
     end
 end)
 
+local function findMachine(machineName)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj.Name == machineName then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function pressE()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+end
+
 rebirthTab:AddButton("⚙️ Industrial Bar Lift", function()
     local character = player.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
@@ -826,6 +841,24 @@ _G.StrTab:AddSwitch("Fast Rep", function(isEnabled)
         _G.runFastRep = false
     end
 end)
+
+local function findMachine(machineName)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj.Name == machineName then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function pressE()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+end
+
+_G.findMachine = findMachine
+_G.pressE = pressE
 
 _G.StrTab:AddButton("⚙️ Industrial Bar Lift", function()
     local character = _G.player.Character
