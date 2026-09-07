@@ -249,6 +249,7 @@ local function fastRebirthLoop()
             ["Swift Samurai"] = 4,
             ["Omega Overlord"] = 1,
             ["Powercore Hound"] = 1
+            ["Titanium Hydra"] = 1
         })
         doRebirth()
         task.wait(0.5)
