@@ -301,6 +301,295 @@ rebirthTab:AddButton("⚙️ Industrial Bar Lift", function()
     end
 end)
 
+rebirthTab:AddButton("🏴 Full FPS Boost", function()
+    local lighting = game:GetService("Lighting")
+    local players = game:GetService("Players")
+    local lp = players.LocalPlayer
+
+    lighting.Brightness = 0
+    lighting.ClockTime = 0
+    lighting.GlobalShadows = false
+    lighting.ExposureCompensation = -10
+    lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+    lighting.Ambient = Color3.new(0, 0, 0)
+    
+    for _, v in pairs(lighting:GetChildren()) do
+        v:Destroy()
+    end
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Color = Color3.new(0, 0, 0)
+            obj.Material = Enum.Material.SmoothPlastic
+        elseif obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("MeshPart") or obj:IsA("SpecialMesh") then
+            obj:Destroy()
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Light") or obj:IsA("Fire") or obj:IsA("Smoke") then
+            obj:Destroy()
+        end
+    end
+
+    if lp and lp:FindFirstChild("PlayerGui") then
+        for _, gui in pairs(lp.PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name ~= "TouchGui" then
+                gui.Enabled = false
+            end
+        end
+    end
+end)
+
+rebirthTab:AddSwitch("⏳ Anti Afk", function(Value)
+    if Value then
+        _G.AntiAfkActive = true
+        _G.AntiAfkLoopActive = true
+        
+        local vu = game:GetService("VirtualUser")
+        local TweenService = game:GetService("TweenService")
+        local RunService = game:GetService("RunService")
+        local Stats = game:GetService("Stats")
+        local player = game:GetService("Players").LocalPlayer
+        local playerGui = player:WaitForChild("PlayerGui")
+
+        _G.antiAfkConnection = player.Idled:Connect(function()
+            if _G.AntiAfkActive then
+                vu:CaptureController()
+                vu:ClickButton2(Vector2.new())
+            end
+        end)
+
+        local ScreenGui = Instance.new("ScreenGui")
+        local MainFrame = Instance.new("Frame")
+        local UICorner = Instance.new("UICorner")
+        local UIStroke = Instance.new("UIStroke")
+        local ContentFrame = Instance.new("Frame")
+        local UIListLayout = Instance.new("UIListLayout")
+
+        ScreenGui.Name = "Str_Premium_AFK"
+        ScreenGui.Parent = playerGui
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.DisplayOrder = 5
+        ScreenGui.IgnoreGuiInset = true
+
+        MainFrame.Name = "MainFrame"
+        MainFrame.Parent = ScreenGui
+        MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        MainFrame.BackgroundTransparency = 0.2
+        MainFrame.BorderSizePixel = 0
+        MainFrame.Position = UDim2.new(1, 20, 0.5, -50)
+        MainFrame.Size = UDim2.new(0, 140, 0, 95)
+        MainFrame.Active = true
+        MainFrame.Draggable = true
+        
+        UICorner.CornerRadius = UDim.new(0, 12)
+        UICorner.Parent = MainFrame
+
+        UIStroke.Parent = MainFrame
+        UIStroke.Thickness = 1.5
+        UIStroke.Color = Color3.fromRGB(40, 40, 40)
+        UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+        ContentFrame.Parent = MainFrame
+        ContentFrame.BackgroundTransparency = 1
+        ContentFrame.Size = UDim2.new(1, 0, 1, 0)
+        ContentFrame.Active = false
+        
+        UIListLayout.Parent = ContentFrame
+        UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        UIListLayout.Padding = UDim.new(0, 2)
+        UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+        local function CreateRow(icon, color)
+            local lbl = Instance.new("TextLabel")
+            lbl.Parent = ContentFrame
+            lbl.Size = UDim2.new(1, -20, 0, 25)
+            lbl.BackgroundTransparency = 1
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.TextSize = 13
+            lbl.Font = Enum.Font.GothamMedium
+            lbl.RichText = true
+            lbl.Text = string.format("<font color='rgb(%d,%d,%d)'>%s</font>", color.R*255, color.G*255, color.B*255, icon)
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            return lbl
+        end
+
+        local TimerLabel = CreateRow("🕒", Color3.fromRGB(255, 50, 50))
+        local FPSLabel = CreateRow("🚀", Color3.fromRGB(50, 255, 100))
+        local MSLabel = CreateRow("📡", Color3.fromRGB(50, 150, 255))
+
+        TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = UDim2.new(1, -155, 0.5, -50)
+        }):Play()
+
+        local startTime = os.time()
+        local currentFPS = 60
+        
+        local fpsUpdateConn
+        fpsUpdateConn = RunService.RenderStepped:Connect(function(dt)
+            if not _G.AntiAfkActive then 
+                fpsUpdateConn:Disconnect()
+                return 
+            end
+            currentFPS = math.floor(1/dt)
+        end)
+
+        task.spawn(function()
+            while _G.AntiAfkActive and _G.AntiAfkLoopActive do
+                local diff = os.time() - startTime
+                TimerLabel.Text = string.format("<font color='rgb(255,50,50)'>🕒</font> %02d:%02d:%02d", math.floor(diff/3600), math.floor((diff%3600)/60), diff%60)
+                
+                FPSLabel.Text = string.format("<font color='rgb(50,255,100)'>🚀</font> %d FPS", currentFPS)
+                
+                local pingStat = Stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
+                local ping = pingStat and math.floor(pingStat:GetValue()) or 0
+                MSLabel.Text = string.format("<font color='rgb(50,150,255)'>📡</font> %d MS", ping)
+                
+                task.wait(0.5)
+            end
+        end)
+
+    else
+        _G.AntiAfkActive = false
+        _G.AntiAfkLoopActive = false
+        if _G.antiAfkConnection then
+            _G.antiAfkConnection:Disconnect()
+            _G.antiAfkConnection = nil
+        end
+        
+        local player = game:GetService("Players").LocalPlayer
+        local playerGui = player and player:FindFirstChild("PlayerGui")
+        if playerGui then
+            local oldGui = playerGui:FindFirstChild("Str_Premium_AFK")
+            if oldGui then
+                local frame = oldGui:FindFirstChild("MainFrame")
+                if frame then
+                    local TweenService = game:GetService("TweenService")
+                    TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+                        Position = UDim2.new(1, 20, 0.5, -50)
+                    }):Play()
+                    task.wait(0.4)
+                end
+                oldGui:Destroy()
+            end
+        end
+    end
+end)
+
+rebirthTab:AddButton("🗑️ Anti-Lag", function()
+    local workspace = game:GetService("Workspace")
+    
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Part") or v:IsA("MeshPart") then
+            if v.Transparency == 1 or v.Parent:IsA("Accessory") then
+                continue
+            end
+            
+            if v.Name == "Leaf" or v.Name == "Grass" or v.Name == "Bush" or v.Name == "SmallRock" or v.Name == "Pebble" then
+                v:Destroy()
+            end
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v:Destroy()
+        end
+    end
+
+    sethiddenproperty(game:GetService("Lighting"), "Technology", Enum.Technology.Compatibility)
+    
+    for _, v in pairs(game:GetService("Lighting"):GetChildren()) do
+        if v:IsA("PostEffect") or v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then
+            v.Enabled = false
+        end
+    end
+
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Syniox Hub",
+        Text = "Map Cleared & Lag Reduced!",
+        Duration = 3
+    })
+end)
+
+local ProteinEggLabel = Misc:AddLabel("Protein Eggs Owned: 0")
+ProteinEggLabel.TextSize = 14
+
+task.spawn(function()
+	while true do
+		local proteinEggCount = 0
+		local tropicalShakeCount = 0
+		local backpack = player:FindFirstChild("Backpack")
+		if backpack then
+			for _, item in ipairs(backpack:GetChildren()) do
+				if item.Name == "Protein Egg" then 
+					proteinEggCount = proteinEggCount + 1
+				elseif item.Name == "Tropical Shake" then 
+					tropicalShakeCount = tropicalShakeCount + 1 
+				end
+			end
+		end
+		ProteinEggLabel.Text = "Protein Eggs: " .. proteinEggCount
+		task.wait(7.5)
+	end
+end)
+
+local ProteinEggBoostLabel = Misc:AddLabel("Protein Egg Boost: 00:00")
+ProteinEggBoostLabel.TextSize = 14
+
+local function formatTime(seconds)
+    local m = math.floor(seconds / 60)
+    local s = seconds % 60
+    return string.format("%02d:%02d", m, s)
+end
+
+task.spawn(function()
+    while true do
+        local boostTimersFolder = game.Players.LocalPlayer:FindFirstChild("boostTimersFolder")
+        if boostTimersFolder then
+            local boost = boostTimersFolder:FindFirstChild("Protein Egg")
+            if boost and boost:IsA("IntValue") then
+                local seconds = boost.Value
+                ProteinEggBoostLabel.Text = "Protein Egg Timer: " .. formatTime(seconds)
+            else
+                ProteinEggBoostLabel.Text = "Protein Egg Timer: 00:00"
+            end
+        else
+            ProteinEggBoostLabel.Text = "Protein Egg Timer: 00:00"
+        end
+        task.wait(0.5)
+    end
+end)
+
+local function useEggs()
+    local boost = game.Players.LocalPlayer.boostTimersFolder:FindFirstChild("Protein Egg")
+    if boost and boost:IsA("IntValue") then
+        local seconds = boost.Value
+        if seconds >= 5 then
+            return
+        end
+    end
+    
+    local tool = player.Character:FindFirstChild("Protein Egg") or player.Backpack:FindFirstChild("Protein Egg")
+    if tool then
+        muscleEvent:FireServer("proteinEgg", tool)
+    end
+end
+
+local running1 = false
+
+task.spawn(function()
+    while true do
+        if running1 then
+            useEggs()
+            task.wait(1800)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+local autoEggSwitch = rebirthTab:AddSwitch("Auto Eat Egg 30 Min", function(state)
+    running1 = state
+    if state then
+        useEggs()
+    end
+end)
+
 _G.StrTab = _G.window:AddTab("Fast Strength")
 
 function _G.formatNumber(num)
@@ -619,3 +908,11 @@ _G.StrTab:AddButton("🎈 Equip Omega Overlord", function()
         task.wait(0.1)
     end
 end)
+
+local credits = window:AddTab("Credits")
+
+local title = credits:AddLabel("🎭 Yusuf Private Script")
+title.TextColor3 = Color3.fromRGB(255, 215, 0)
+
+local dev = credits:AddLabel("👤 Developer: Yusuf")
+dev.TextColor3 = Color3.fromRGB(255, 50, 50)
