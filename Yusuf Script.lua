@@ -209,8 +209,8 @@ local function equipPets(reqs)
 end
 
 local function doRebirth()
-    local cReb = rebirthsStat.Value
-    local strengthTarget = 10000 + (5000 * cReb)
+    local rebirths = rebirthsStat.Value
+    local strengthTarget = 5000 + (rebirths * 2550)
 
     local ultimatesFolder = player:FindFirstChild("ultimatesFolder")
     if ultimatesFolder then
@@ -221,10 +221,11 @@ local function doRebirth()
     end
 
     while isRunning and leaderstats.Strength.Value < strengthTarget do
-        for i = 1, 12 do
+        local reps = player.MembershipType == Enum.MembershipType.Premium and 12 or 20
+        for _ = 1, reps do
             muscleEvent:FireServer("rep")
         end
-        task.wait(0.01)
+        task.wait(0.02)
     end
 
     if isRunning and leaderstats.Strength.Value >= strengthTarget then
@@ -237,7 +238,7 @@ local function doRebirth()
         local before = rebirthsStat.Value
         repeat
             rEvents.rebirthRemote:InvokeServer("rebirthRequest")
-            task.wait(0.5)
+            task.wait(0.05)
         until rebirthsStat.Value > before or not isRunning
     end
 end
