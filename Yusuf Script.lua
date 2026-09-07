@@ -506,7 +506,7 @@ rebirthTab:AddButton("🗑️ Anti-Lag", function()
     })
 end)
 
-local ProteinEggLabel = Misc:AddLabel("Protein Eggs Owned: 0")
+local ProteinEggLabel = rebirthTab:AddLabel("Protein Eggs Owned: 0")
 ProteinEggLabel.TextSize = 14
 
 task.spawn(function()
@@ -528,7 +528,7 @@ task.spawn(function()
 	end
 end)
 
-local ProteinEggBoostLabel = Misc:AddLabel("Protein Egg Boost: 00:00")
+local ProteinEggBoostLabel = rebirthTab:AddLabel("Protein Egg Boost: 00:00")
 ProteinEggBoostLabel.TextSize = 14
 
 local function formatTime(seconds)
