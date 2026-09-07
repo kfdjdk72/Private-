@@ -26,7 +26,7 @@ _G.player = player
 local displayName = player.DisplayName
 _G.displayName = displayName 
 
-local window = library:AddWindow("Syniox Private | Muscle Legends || HI - ".. displayName, {
+local window = library:AddWindow("Yusuf Private | Muscle Legends || HI - ".. displayName, {
     title_bar = {
         Color3.fromRGB(180, 0, 255),
         Color3.fromRGB(60, 0, 100),
