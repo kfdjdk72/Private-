@@ -183,7 +183,7 @@ rebirthsStat:GetPropertyChangedSignal("Value"):Connect(function()
     updateRebirthsLabel()
 end)
 
-local function managePets(petName)
+local function equipPets(reqs)
     for _, folder in pairs(petsFolder:GetChildren()) do
         if folder:IsA("Folder") then
             for _, pet in pairs(folder:GetChildren()) do
@@ -193,19 +193,24 @@ local function managePets(petName)
     end
     task.wait(0.1)
 
-    local uniqueFolder = petsFolder:FindFirstChild("Unique")
-    if uniqueFolder then
-        for _, pet in pairs(uniqueFolder:GetChildren()) do
-            if pet.Name == petName then
-                rEvents.equipPetEvent:FireServer("equipPet", pet)
+    for petName, count in pairs(reqs) do
+        local equipped = 0
+        for _, folder in pairs(petsFolder:GetChildren()) do
+            if folder:IsA("Folder") then
+                for _, pet in pairs(folder:GetChildren()) do
+                    if pet.Name == petName and equipped < count then
+                        rEvents.equipPetEvent:FireServer("equipPet", pet)
+                        equipped = equipped + 1
+                    end
+                end
             end
         end
     end
 end
 
 local function doRebirth()
-    local rebirths = rebirthsStat.Value
-    local strengthTarget = 5000 + (rebirths * 2550)
+    local cReb = rebirthsStat.Value
+    local strengthTarget = 10000 + (5000 * cReb)
 
     local ultimatesFolder = player:FindFirstChild("ultimatesFolder")
     if ultimatesFolder then
@@ -216,28 +221,34 @@ local function doRebirth()
     end
 
     while isRunning and leaderstats.Strength.Value < strengthTarget do
-        local reps = player.MembershipType == Enum.MembershipType.Premium and 12 or 20
-        for _ = 1, reps do
+        for i = 1, 12 do
             muscleEvent:FireServer("rep")
         end
-        task.wait(0.02)
+        task.wait(0.01)
     end
 
     if isRunning and leaderstats.Strength.Value >= strengthTarget then
-        managePets("Tribal Overlord")
+        equipPets({
+            ["Tribal Overlord"] = 4,
+            ["Titanium Hydra"] = 1
+        })
         task.wait(0.25)
 
         local before = rebirthsStat.Value
         repeat
             rEvents.rebirthRemote:InvokeServer("rebirthRequest")
-            task.wait(0.05)
+            task.wait(0.5)
         until rebirthsStat.Value > before or not isRunning
     end
 end
 
 local function fastRebirthLoop()
     while isRunning do
-        managePets("Swift Samurai")
+        equipPets({
+            ["Swift Samurai"] = 4,
+            ["Omega Overlord"] = 1,
+            ["Powercore Hound"] = 1
+        })
         doRebirth()
         task.wait(0.5)
     end
@@ -308,7 +319,7 @@ if not _G.durabilityStat then
     _G.durabilityStat.Value = 0
 end
 
-_G.StrTab:AddLabel("ğŸ“Š Stats:").TextSize = 17
+_G.StrTab:AddLabel("📊 Stats:").TextSize = 17
 _G.stopwatchLabel = _G.StrTab:AddLabel("0d 0h 0m 0s - Fast Rep Inactive")
 _G.stopwatchLabel.TextSize = 15
 _G.stopwatchLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
