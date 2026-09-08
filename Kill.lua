@@ -493,15 +493,30 @@ Kill:AddSwitch("⚔️ Auto Kill All (Ignore Whitelist)", function(bool)
     task.spawn(function()
         while _G.AutoKill do
             local char = LocalPlayer.Character
+            local rootPart = char and char:FindFirstChild("HumanoidRootPart")
             local rHand = char and char:FindFirstChild("RightHand")
-            if rHand then
+            
+            if rootPart then
                 for _, target in ipairs(Players:GetPlayers()) do
                     if target ~= LocalPlayer and not playerWhitelist[target.Name] then
-                        local root = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-                        if root then
+                        local tChar = target.Character
+                        local targetRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                        local tHumanoid = tChar and tChar:FindFirstChild("Humanoid")
+                        
+                        if targetRoot and tHumanoid and tHumanoid.Health > 0 then
                             pcall(function()
-                                firetouchinterest(rHand, root, 1)
-                                firetouchinterest(rHand, root, 0)
+                                -- 1. Yöntem: RightHand ile dokunma
+                                if rHand then
+                                    firetouchinterest(rHand, targetRoot, 0)
+                                    firetouchinterest(rHand, targetRoot, 1)
+                                end
+                                
+                                -- 2. Yöntem: HumanoidRootPart ile dokunma (RCH / hitbox yedeklemesi)
+                                firetouchinterest(rootPart, targetRoot, 0)
+                                firetouchinterest(rootPart, targetRoot, 1)
+                                
+                                -- 3. Yöntem: muscleEvent tetiklemesi (Eğer oyun remote bekliyorsa)
+                                LocalPlayer.muscleEvent:FireServer("punch", "rightHand")
                             end)
                         end
                     end
