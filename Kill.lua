@@ -1,22 +1,3 @@
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local muscleEvent = player:WaitForChild("muscleEvent")
-local leaderstats = player:WaitForChild("leaderstats")
-local rebirthsStat = leaderstats:WaitForChild("Rebirths")
-local rEvents = ReplicatedStorage:WaitForChild("rEvents")
-
-_G.Players = game:GetService("Players")
-_G.player = _G.Players.LocalPlayer
-_G.VirtualInputManager = game:GetService("VirtualInputManager")
-_G.ReplicatedStorage = game:GetService("ReplicatedStorage")
-_G.muscleEvent = _G.player:WaitForChild("muscleEvent")
-_G.leaderstats = _G.player:WaitForChild("leaderstats")
-_G.rebirthsStat = _G.leaderstats:WaitForChild("Rebirths")
-_G.rEvents = _G.ReplicatedStorage:WaitForChild("rEvents")
-
-
 local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/SynioxStudios/Syn-Paid-Ui/refs/heads/main/SynioxGui.txt"))()
 _G.library = library 
 
