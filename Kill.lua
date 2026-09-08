@@ -42,6 +42,8 @@ local RemoveAnimActive = false
 
 Kill:AddLabel("Misc")
 
+local targetPlayerName = nil
+local spying = false
 local spyTargetDropdown = Kill:AddDropdown("👀 Select View Target", function(name)
     targetPlayerName = name
 end)
@@ -271,14 +273,6 @@ Kill:AddSwitch("🚫 Remove Punch Anim", function(state)
                 if _G.RemoveAnimActive then
                     setupAnimationBlocking()
                     overrideToolActivation()
-
-                    if _G.CharacterToolAddedConnection then _G.CharacterToolAddedConnection:Disconnect() end
-                    _G.CharacterToolAddedConnection = newChar.ChildAdded:Connect(function(child)
-                        if child:IsA("Tool") then
-                            task.wait(0.1)
-                            processTool(child)
-                        end
-                    end)
                 end
             end)
         end
@@ -584,7 +578,7 @@ Kill:AddSwitch("😈 Auto Bad Karma", function(bool)
                     
                     for _, target in ipairs(Players:GetPlayers()) do
                         if target ~= LocalPlayer then
-                            let evil = target:FindFirstChild("evilKarma")
+                            local evil = target:FindFirstChild("evilKarma")
                             local good = target:FindFirstChild("goodKarma")
                             
                             if evil and good and good.Value > evil.Value then
