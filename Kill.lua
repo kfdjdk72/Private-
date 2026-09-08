@@ -42,8 +42,6 @@ local RemoveAnimActive = false
 
 Kill:AddLabel("Misc")
 
-local targetPlayerName = nil
-local spying = false
 local spyTargetDropdown = Kill:AddDropdown("👀 Select View Target", function(name)
     targetPlayerName = name
 end)
@@ -273,6 +271,14 @@ Kill:AddSwitch("🚫 Remove Punch Anim", function(state)
                 if _G.RemoveAnimActive then
                     setupAnimationBlocking()
                     overrideToolActivation()
+
+                    if _G.CharacterToolAddedConnection then _G.CharacterToolAddedConnection:Disconnect() end
+                    _G.CharacterToolAddedConnection = newChar.ChildAdded:Connect(function(child)
+                        if child:IsA("Tool") then
+                            task.wait(0.1)
+                            processTool(child)
+                        end
+                    end)
                 end
             end)
         end
@@ -298,14 +304,13 @@ Kill:AddSwitch("🥊 Auto Punch [No Animation]", function(state)
     autoPunchNoAnim = state
     task.spawn(function()
         while autoPunchNoAnim do
-            local punch = LocalPlayer.Backpack:FindFirstChild("Punch") or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Punch"))
+            local punch = LocalPlayer.Backpack:FindFirstChild("Punch") or LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Punch")
             if punch then
                 if punch.Parent ~= LocalPlayer.Character then
                     punch.Parent = LocalPlayer.Character
                 end
-                pcall(function()
-                    punch:Activate()
-                end)
+                LocalPlayer.muscleEvent:FireServer("punch", "rightHand")
+                LocalPlayer.muscleEvent:FireServer("punch", "leftHand")
             else
                 autoPunchNoAnim = false
             end
@@ -488,33 +493,21 @@ Kill:AddSwitch("⚔️ Auto Kill All (Ignore Whitelist)", function(bool)
     task.spawn(function()
         while _G.AutoKill do
             local char = LocalPlayer.Character
-            local punch = LocalPlayer.Backpack:FindFirstChild("Punch") or (char and char:FindFirstChild("Punch"))
-            local myRoot = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if char and punch and myRoot then
-                if punch.Parent ~= char then
-                    punch.Parent = char
-                end
-                
+            local rHand = char and char:FindFirstChild("RightHand")
+            if rHand then
                 for _, target in ipairs(Players:GetPlayers()) do
                     if target ~= LocalPlayer and not playerWhitelist[target.Name] then
-                        local tChar = target.Character
-                        local root = tChar and tChar:FindFirstChild("HumanoidRootPart")
-                        local humanoid = tChar and tChar:FindFirstChild("Humanoid")
-                        
-                        if root and humanoid and humanoid.Health > 0 then
+                        local root = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+                        if root then
                             pcall(function()
-                                local oldCFrame = myRoot.CFrame
-                                myRoot.CFrame = root.CFrame * CFrame.new(0, 0, 1)
-                                punch:Activate()
-                                task.wait(0.01)
-                                myRoot.CFrame = oldCFrame
+                                firetouchinterest(rHand, root, 1)
+                                firetouchinterest(rHand, root, 0)
                             end)
                         end
                     end
                 end
             end
-            task.wait(0.05)
+            task.wait(0.01)
         end
     end)
 end)
@@ -525,14 +518,9 @@ Kill:AddSwitch("😇 Auto Good Karma", function(bool)
         task.spawn(function()
             while _G.GoodKarma do
                 local char = LocalPlayer.Character
-                local punch = LocalPlayer.Backpack:FindFirstChild("Punch") or (char and char:FindFirstChild("Punch"))
-                local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+                local rHand = char and char:FindFirstChild("RightHand")
                 
-                if char and punch and myRoot and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-                    if punch.Parent ~= char then
-                        punch.Parent = char
-                    end
-                    
+                if rHand and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
                     for _, target in ipairs(Players:GetPlayers()) do
                         if target ~= LocalPlayer then
                             local evil = target:FindFirstChild("evilKarma")
@@ -543,13 +531,8 @@ Kill:AddSwitch("😇 Auto Good Karma", function(bool)
                                 if tChar and tChar:FindFirstChild("Humanoid") and tChar.Humanoid.Health > 0 then
                                     local root = tChar:FindFirstChild("HumanoidRootPart")
                                     if root then
-                                        pcall(function()
-                                            local oldCFrame = myRoot.CFrame
-                                            myRoot.CFrame = root.CFrame * CFrame.new(0, 0, 1)
-                                            punch:Activate()
-                                            task.wait(0.01)
-                                            myRoot.CFrame = oldCFrame
-                                        end)
+                                        firetouchinterest(rHand, root, 0)
+                                        firetouchinterest(rHand, root, 1)
                                     end
                                 end
                             end
@@ -568,14 +551,9 @@ Kill:AddSwitch("😈 Auto Bad Karma", function(bool)
         task.spawn(function()
             while _G.BadKarma do
                 local char = LocalPlayer.Character
-                local punch = LocalPlayer.Backpack:FindFirstChild("Punch") or (char and char:FindFirstChild("Punch"))
-                local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+                local rHand = char and char:FindFirstChild("RightHand")
                 
-                if char and punch and myRoot and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-                    if punch.Parent ~= char then
-                        punch.Parent = char
-                    end
-                    
+                if rHand and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
                     for _, target in ipairs(Players:GetPlayers()) do
                         if target ~= LocalPlayer then
                             local evil = target:FindFirstChild("evilKarma")
@@ -586,13 +564,8 @@ Kill:AddSwitch("😈 Auto Bad Karma", function(bool)
                                 if tChar and tChar:FindFirstChild("Humanoid") and tChar.Humanoid.Health > 0 then
                                     local root = tChar:FindFirstChild("HumanoidRootPart")
                                     if root then
-                                        pcall(function()
-                                            local oldCFrame = myRoot.CFrame
-                                            myRoot.CFrame = root.CFrame * CFrame.new(0, 0, 1)
-                                            punch:Activate()
-                                            task.wait(0.01)
-                                            myRoot.CFrame = oldCFrame
-                                        end)
+                                        firetouchinterest(rHand, root, 0)
+                                        firetouchinterest(rHand, root, 1)
                                     end
                                 end
                             end
@@ -615,3 +588,46 @@ local function updateBlacklistLabel()
     for _, name in ipairs(targetPlayerNames) do str = str .. name .. ", " end
     blacklistShow.Text = str ~= "" and "Targets: " .. str:sub(1, #str - 2) or "Targets: None"
 end
+
+local targetDropdown = Kill:AddDropdown("🎭 Select Target", function(name)
+    if name and not table.find(targetPlayerNames, name) then 
+        table.insert(targetPlayerNames, name) 
+        updateBlacklistLabel()
+    end
+end)
+
+Kill:AddButton("🚫 Clear Blacklist", function()
+    targetPlayerNames = {} updateBlacklistLabel()
+end)
+
+Kill:AddSwitch("🎯 Start Kill Target", function(state)
+    _G.KillTarget = state
+    task.spawn(function()
+        while _G.KillTarget do
+            local char = LocalPlayer.Character
+            local rHand = char and char:FindFirstChild("RightHand")
+            if rHand then
+                for _, name in ipairs(targetPlayerNames) do
+                    local t = Players:FindFirstChild(name)
+                    if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+                        pcall(function()
+                            firetouchinterest(rHand, t.Character.HumanoidRootPart, 1)
+                            firetouchinterest(rHand, t.Character.HumanoidRootPart, 0)
+                        end)
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+    end)
+end)
+
+local function updateAllDropdowns(p)
+    if p ~= LocalPlayer then
+        whitelistDropdown:Add(p.Name)
+        targetDropdown:Add(p.Name)
+    end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do updateAllDropdowns(p) end
+Players.PlayerAdded:Connect(updateAllDropdowns)
