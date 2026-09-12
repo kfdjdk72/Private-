@@ -248,8 +248,8 @@ local function fastRebirthLoop()
         equipPets({
             ["Swift Samurai"] = 4,
             ["Omega Overlord"] = 1,
-            ["Powercore Hound"] = 1,
             ["Legendary Boss Pet"] = 1,
+            ["Powercore Hound"] = 1,
             ["Titanium Hydra"] = 1
         })
         doRebirth()
