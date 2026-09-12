@@ -249,6 +249,7 @@ local function fastRebirthLoop()
             ["Swift Samurai"] = 4,
             ["Omega Overlord"] = 1,
             ["Powercore Hound"] = 1,
+		    ["Legendary Boss Pet"] = 1,
             ["Titanium Hydra"] = 1
         })
         doRebirth()
@@ -485,6 +486,24 @@ rebirthTab:AddSwitch("⏳ Anti Afk", function(Value)
                 end
                 oldGui:Destroy()
             end
+        end
+    end
+end)
+
+local switch = rebirthTab:AddSwitch("📌 Lock Position", function(Value)
+    if Value then
+        
+        local currentPos = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
+        getgenv().posLock = game:GetService("RunService").Heartbeat:Connect(function()
+            if game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = currentPos
+            end
+        end)
+    else
+        
+        if getgenv().posLock then
+            getgenv().posLock:Disconnect()
+            getgenv().posLock = nil
         end
     end
 end)
