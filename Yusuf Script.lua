@@ -614,16 +614,22 @@ task.spawn(function()
 end)
 
 local function useEggs()
-    local boost = game.Players.LocalPlayer.boostTimersFolder:FindFirstChild("Protein Egg")
-    if boost and boost:IsA("IntValue") then
-        local seconds = boost.Value
-        if seconds >= 5 then
+    local boostFolder = game.Players.LocalPlayer:FindFirstChild("boostTimersFolder")
+    if boostFolder then
+        local boost = boostFolder:FindFirstChild("Protein Egg")
+        if boost and boost:IsA("IntValue") and boost.Value >= 5 then
             return
         end
     end
     
-    local tool = player.Character:FindFirstChild("Protein Egg") or player.Backpack:FindFirstChild("Protein Egg")
+    local char = player.Character or player.CharacterAdded:Wait()
+    local tool = char:FindFirstChild("Protein Egg") or player.Backpack:FindFirstChild("Protein Egg")
+    
     if tool then
+        if tool.Parent == player.Backpack and char:FindFirstChildOfClass("Humanoid") then
+            char.Humanoid:EquipTool(tool)
+            task.wait(0.2)
+        end
         muscleEvent:FireServer("proteinEgg", tool)
     end
 end
@@ -634,14 +640,12 @@ task.spawn(function()
     while true do
         if running1 then
             useEggs()
-            task.wait(1800)
-        else
-            task.wait(1)
         end
+        task.wait(10)
     end
 end)
 
-local autoEggSwitch = rebirthTab:AddSwitch("Auto Eat Egg 30 Min", function(state)
+local autoEggSwitch = rebirthTab:AddSwitch("🥚 Auto Eat Egg 30 Min", function(state)
     running1 = state
     if state then
         useEggs()
