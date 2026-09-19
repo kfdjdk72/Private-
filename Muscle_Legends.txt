@@ -2258,6 +2258,172 @@ farmingTab:AddButton("🏴 Full FPS Boost", function()
     for _, v in pairs(lighting:GetChildren()) do if v:IsA("Sky") then v:Destroy() end end
 end)
 
+local RunService = game:GetService("RunService")
+
+local bossTab = window:AddTab("Boss")
+
+bossTab:AddLabel("👊 Boss Farm")
+bossTab:AddLabel("---------------------")
+
+local bossSpawnTimeLabel = bossTab:AddLabel("Boss Status: Checking...")
+local bossHealthLabel = bossTab:AddLabel("Boss Health: Unknown")
+local bossPercentLabel = bossTab:AddLabel("Boss Health %: 0%")
+
+local bossFarmActive = false
+local autoCollectChest = false
+local lastBossInstance = nil
+local lockConnection = nil
+
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+
+        local activeBossContainer = nil
+        local activeBossPart = nil
+        local bossArena = workspace:FindFirstChild("Events") and workspace.Events:FindFirstChild("BossArena")
+
+        if bossArena then
+            for _, child in ipairs(bossArena:GetChildren()) do
+                if child.Name:lower():find("boss") then
+                    local stats = child:FindFirstChild("stats")
+                    local healthVal = stats and stats:FindFirstChild("Health")
+
+                    if healthVal and healthVal.Value > 0 then
+                        local bossPart = child:FindFirstChild("Boss") or child:FindFirstChild("BossDamageHitbox")
+                        if bossPart then
+                            activeBossContainer = child
+                            activeBossPart = bossPart
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+        if activeBossContainer and activeBossPart then
+            local stats = activeBossContainer:FindFirstChild("stats")
+            local healthVal = stats and stats:FindFirstChild("Health")
+            local maxHealthVal = stats and stats:FindFirstChild("MaxHealth")
+
+            if healthVal and maxHealthVal then
+                bossSpawnTimeLabel.Text = "Boss Status: Active / Spawned!"
+                bossHealthLabel.Text = "Boss Health: " .. math.floor(healthVal.Value) .. " / " .. math.floor(maxHealthVal.Value)
+
+                local currentHealth = healthVal.Value
+                local maxHealth = maxHealthVal.Value
+                if maxHealth > 0 then
+                    local percent = (currentHealth / maxHealth) * 100
+                    bossPercentLabel.Text = "Boss Health %: " .. string.format("%.1f", percent) .. "%"
+                else
+                    bossPercentLabel.Text = "Boss Health %: 0%"
+                end
+            end
+
+            if lastBossInstance ~= activeBossContainer then
+                lastBossInstance = activeBossContainer
+            end
+
+            if bossFarmActive then
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                local humanoid = char and char:FindFirstChild("Humanoid")
+
+                if not char or not hrp or not humanoid or humanoid.Health <= 0 then
+                    if lockConnection then
+                        lockConnection:Disconnect()
+                        lockConnection = nil
+                    end
+                    task.wait(1)
+                else
+                    if not lockConnection then
+                        lockConnection = RunService.Heartbeat:Connect(function()
+                            local currentCustomChar = player.Character
+                            local currentHrp = currentCustomChar and currentCustomChar:FindFirstChild("HumanoidRootPart")
+                            local currentHum = currentCustomChar and currentCustomChar:FindFirstChild("Humanoid")
+
+                            if not bossFarmActive or not activeBossPart or not currentHrp or not currentHum or currentHum.Health <= 0 then
+                                if lockConnection then
+                                    lockConnection:Disconnect()
+                                    lockConnection = nil
+                                end
+                                return
+                            end
+
+                            currentHrp.CFrame = activeBossPart.CFrame
+                            currentHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                            currentHrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                        end)
+                    end
+
+                    local punch = player.Backpack:FindFirstChild("Punch") or char:FindFirstChild("Punch")
+                    if punch then
+                        if punch.Parent ~= char then
+                            humanoid:EquipTool(punch)
+                        end
+                        if punch:FindFirstChild("attackTime") then
+                            punch.attackTime.Value = 0
+                        end
+                        punch:Activate()
+                        muscleEvent:FireServer("punch", "rightHand")
+                        muscleEvent:FireServer("punch", "leftHand")
+                    end
+                end
+            else
+                if lockConnection then
+                    lockConnection:Disconnect()
+                    lockConnection = nil
+                end
+            end
+
+            if autoCollectChest then
+                pcall(function()
+                    local chestFolder = activeBossContainer:FindFirstChild("Chest")
+                        or activeBossContainer:FindFirstChild("BossChest")
+                        or activeBossContainer:FindFirstChild("Reward")
+
+                    if chestFolder then
+                        local chestPart = chestFolder:IsA("BasePart") and chestFolder
+                            or chestFolder:FindFirstChildWhichIsA("BasePart")
+
+                        if chestPart then
+                            local char = player.Character
+                            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                            if hrp and firetouchinterest then
+                                firetouchinterest(chestPart, hrp, 0)
+                                firetouchinterest(chestPart, hrp, 1)
+                            end
+                        end
+                    end
+                end)
+            end
+        else
+            bossSpawnTimeLabel.Text = "Boss Status: Waiting to Spawn..."
+            bossHealthLabel.Text = "Boss Health: None"
+            bossPercentLabel.Text = "Boss Health %: 0%"
+            lastBossInstance = nil
+
+            if lockConnection then
+                lockConnection:Disconnect()
+                lockConnection = nil
+            end
+        end
+    end
+end)
+
+bossTab:AddLabel("---------------------")
+
+bossTab:AddSwitch("💢 Auto Kill Boss", function(state)
+    bossFarmActive = state
+    if not state and lockConnection then
+        lockConnection:Disconnect()
+        lockConnection = nil
+    end
+end)
+
+bossTab:AddSwitch("🎁 Auto Collect Chest", function(state)
+    autoCollectChest = state
+end)
+
 local pets = window:AddTab("Pets")
 pets:AddLabel("💰 Auto Buy")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
