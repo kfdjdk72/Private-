@@ -534,6 +534,20 @@ Tabs.Rebirths:AddSwitch("👑 Auto Teleport to Muscle King", function(bool)
     end
 end, "Tp to Mk")
 
+Tabs.Rebirths:AddSwitch("🛡️ Auto Teleport to Safe Zone", function(bool)
+    State.teleportActive = bool
+    
+    if bool then
+        task.spawn(function()
+            while State.teleportActive and task.wait() do
+                if PlayerData.Player.Character then
+                    PlayerData.Player.Character:MoveTo(Vector3.new(-211.17, 36.55, -1243.22))
+                end
+            end
+        end)
+    end
+end, "Tp to Safe Zone")
+
 local selectedUltimate = nil
 local autoBuyActive = false
 
