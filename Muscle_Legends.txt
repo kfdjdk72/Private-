@@ -2341,8 +2341,8 @@ local Boss = {
     RedDodgeDelay = 1.5,
     RedDodgeDuration = 0.2,
 
-    YellowDodgeDelay = 2.1,
-    YellowDodgeDuration = 0.4,
+    YellowDodgeDelay = 2.0,
+    YellowDodgeDuration = 0.5,
 
     DodgeCooldownTime = 3.5,
     ReturnDelay = 0.15
