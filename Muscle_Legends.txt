@@ -82,6 +82,7 @@ local Tabs = {
     Stats = window:AddTab("Stats"),
     Rock = window:AddTab("Rock"),
     FastFarming = window:AddTab("Fast Farming"),
+    Boss = window:AddTab("Boss"),
     Pets = window:AddTab("Pets"),
     Gym = window:AddTab("Gym"),
     Misc = window:AddTab("Misc"),
