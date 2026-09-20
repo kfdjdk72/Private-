@@ -2310,6 +2310,491 @@ Tabs.FastFarming:AddButton("🏴 Full FPS Boost", function()
     for _, v in pairs(lighting:GetChildren()) do if v:IsA("Sky") then v:Destroy() end end
 end)
 
+Tabs.Boss:AddLabel("👊 Boss Farm")
+Tabs.Boss:AddLabel("---------------------")
+
+local bossSpawnTimeLabel = Tabs.Boss:AddLabel("Boss Status: Checking...")
+local bossHealthLabel = Tabs.Boss:AddLabel("Boss Health: Unknown")
+local bossPercentLabel = Tabs.Boss:AddLabel("Boss Health %: 0%")
+local bossDamageLabel = Tabs.Boss:AddLabel("Your Damage: 0")
+
+local bossFarmActive = false
+local autoCollectChest = false
+local currentBoss = nil
+local currentBossPart = nil
+local currentHitbox = nil
+local currentHealth = nil
+local currentMaxHealth = nil
+local currentDamageValues = nil
+local movementConnection = nil
+local punchRunning = false
+local isDodging = false
+local dodgeConnection = nil
+local dodgeCooldown = false
+
+local SAFE_POSITION = CFrame.new(-34, 7, 1903)
+
+local RED_SOUND_ID = "rbxassetid://137955546699156"
+local YELLOW_SOUND_ID = "rbxassetid://127819174075907"
+
+local RED_DODGE_DELAY = 1.5
+local RED_DODGE_DURATION = 0.2
+
+local YELLOW_DODGE_DELAY = 2.2
+local YELLOW_DODGE_DURATION = 0.2
+
+local DODGE_COOLDOWN = 3.5
+local RETURN_DELAY = 0.15
+
+local function getActiveBoss()
+    local events = Services.Workspace:FindFirstChild("Events")
+    local bossArena = events and events:FindFirstChild("BossArena")
+    if not bossArena then
+        return nil
+    end
+    for _, child in ipairs(bossArena:GetChildren()) do
+        if child:IsA("Model") and child.Name:lower():find("boss") then
+            local stats = child:FindFirstChild("stats")
+            local healthVal = stats and stats:FindFirstChild("Health")
+            local maxHealthVal = stats and stats:FindFirstChild("MaxHealth")
+            local bossPart = child:FindFirstChild("Boss")
+            local hitbox = child:FindFirstChild("BossDamageHitbox")
+            local damageValues = child:FindFirstChild("damageValues")
+            if healthVal
+                and maxHealthVal
+                and bossPart
+                and healthVal:IsA("NumberValue")
+                and maxHealthVal:IsA("NumberValue")
+                and healthVal.Value > 0 then
+                return child, bossPart, healthVal, maxHealthVal, hitbox, damageValues
+            end
+        end
+    end
+    return nil
+end
+
+local function stopMovement()
+    if movementConnection then
+        movementConnection:Disconnect()
+        movementConnection = nil
+    end
+    if dodgeConnection then
+        dodgeConnection:Disconnect()
+        dodgeConnection = nil
+    end
+    isDodging = false
+end
+
+local function updateDamageDisplay()
+    if not currentDamageValues then
+        bossDamageLabel.Text = "Your Damage: 0"
+        return
+    end
+    
+    local playerName = PlayerData.Player.Name
+    local damageValue = currentDamageValues:FindFirstChild(playerName)
+    
+    if damageValue and damageValue:IsA("NumberValue") then
+        local damage = damageValue.Value
+        if damage >= 1000000000000 then
+            bossDamageLabel.Text = "Your Damage: " .. string.format("%.1f", damage / 1000000000000) .. "T"
+        elseif damage >= 1000000000 then
+            bossDamageLabel.Text = "Your Damage: " .. string.format("%.1f", damage / 1000000000) .. "B"
+        elseif damage >= 1000000 then
+            bossDamageLabel.Text = "Your Damage: " .. string.format("%.1f", damage / 1000000) .. "M"
+        elseif damage >= 1000 then
+            bossDamageLabel.Text = "Your Damage: " .. string.format("%.1f", damage / 1000) .. "K"
+        else
+            bossDamageLabel.Text = "Your Damage: " .. math.floor(damage)
+        end
+    else
+        bossDamageLabel.Text = " Your Damage: 0"
+    end
+end
+
+local function setupDamageListener(damageValues)
+    if not damageValues then
+        return
+    end
+    
+    currentDamageValues = damageValues
+    updateDamageDisplay()
+    
+    damageValues.ChildAdded:Connect(function(child)
+        if child:IsA("NumberValue") and child.Name == PlayerData.Player.Name then
+            child.Changed:Connect(function()
+                if bossFarmActive then
+                    updateDamageDisplay()
+                end
+            end)
+            updateDamageDisplay()
+        end
+    end)
+    
+    local playerDamage = damageValues:FindFirstChild(PlayerData.Player.Name)
+    if playerDamage and playerDamage:IsA("NumberValue") then
+        playerDamage.Changed:Connect(function()
+            if bossFarmActive then
+                updateDamageDisplay()
+            end
+        end)
+    end
+end
+
+local function performDodge(soundId)
+    if isDodging or dodgeCooldown then
+        return
+    end
+    
+    local delayTime, durationTime
+    
+    if soundId == RED_SOUND_ID then
+        delayTime = RED_DODGE_DELAY
+        durationTime = RED_DODGE_DURATION
+    elseif soundId == YELLOW_SOUND_ID then
+        delayTime = YELLOW_DODGE_DELAY
+        durationTime = YELLOW_DODGE_DURATION
+    else
+        return
+    end
+    
+    dodgeCooldown = true
+    isDodging = true
+    
+    task.delay(DODGE_COOLDOWN, function()
+        dodgeCooldown = false
+    end)
+    
+    task.delay(delayTime, function()
+        if not bossFarmActive or not PlayerData.Player.Character then
+            isDodging = false
+            return
+        end
+        
+        local currentHrp = PlayerData.Player.Character:FindFirstChild("HumanoidRootPart")
+        if not currentHrp then
+            isDodging = false
+            return
+        end
+        
+        if dodgeConnection then
+            dodgeConnection:Disconnect()
+        end
+        
+        local startTime = tick()
+        
+        dodgeConnection = Services.RunService.Heartbeat:Connect(function()
+            local elapsed = tick() - startTime
+            if elapsed >= durationTime then
+                dodgeConnection:Disconnect()
+                dodgeConnection = nil
+                isDodging = false
+                
+                task.delay(RETURN_DELAY, function()
+                    if bossFarmActive and PlayerData.Player.Character and PlayerData.Player.Character:FindFirstChild("HumanoidRootPart") and currentBossPart and currentBossPart.Parent then
+                        local finalHrp = PlayerData.Player.Character.HumanoidRootPart
+                        finalHrp.CFrame = currentBossPart.CFrame * CFrame.new(0, 2, 3.5)
+                    end
+                end)
+                return
+            end
+            
+            currentHrp.CFrame = SAFE_POSITION
+            currentHrp.AssemblyLinearVelocity = Vector3.zero
+            currentHrp.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end)
+end
+
+local function setupBossListeners(bossModel)
+    if not bossModel then
+        return
+    end
+    
+    local bossPart = bossModel:FindFirstChild("Boss")
+    if not bossPart then
+        return
+    end
+    
+    local function listenToSound(sound)
+        if not sound or not sound:IsA("Sound") then
+            return
+        end
+        
+        sound.Played:Connect(function()
+            if bossFarmActive and not isDodging then
+                if sound.SoundId == RED_SOUND_ID or sound.SoundId == YELLOW_SOUND_ID then
+                    performDodge(sound.SoundId)
+                end
+            end
+        end)
+    end
+    
+    local sfxSound = bossPart:FindFirstChild("bossEventSfxRuntime")
+    if sfxSound then
+        listenToSound(sfxSound)
+    end
+    
+    bossPart.ChildAdded:Connect(function(child)
+        if child:IsA("Sound") and child.Name == "bossEventSfxRuntime" then
+            listenToSound(child)
+        end
+    end)
+end
+
+local function startMovement()
+    if movementConnection then
+        return
+    end
+    
+    movementConnection = Services.RunService.Heartbeat:Connect(function()
+        if not bossFarmActive then
+            stopMovement()
+            return
+        end
+        
+        local boss = currentBoss
+        local bossPart = currentBossPart
+        
+        if not boss
+            or not boss.Parent
+            or not bossPart
+            or not bossPart.Parent
+            or not currentHealth
+            or currentHealth.Value <= 0 then
+            return
+        end
+        
+        local char = PlayerData.Player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        
+        if not hrp or not humanoid or humanoid.Health <= 0 then
+            return
+        end
+        
+        if not isDodging then
+            hrp.CFrame = bossPart.CFrame * CFrame.new(0, 2, 3.5)
+        end
+        
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
+
+local function punchBoss()
+    if not bossFarmActive or isDodging then
+        return
+    end
+    
+    if not currentBoss
+        or not currentBoss.Parent
+        or not currentHealth
+        or currentHealth.Value <= 0 then
+        return
+    end
+    
+    local char = PlayerData.Player.Character
+    if not char then
+        return
+    end
+    
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return
+    end
+    
+    local punch = char:FindFirstChild("Punch") or PlayerData.Player.Backpack:FindFirstChild("Punch")
+    if not punch then
+        return
+    end
+    
+    pcall(function()
+        if punch.Parent ~= char then
+            punch.Parent = char
+        end
+        
+        if punch:FindFirstChild("attackTime") then
+            punch.attackTime.Value = 0
+        end
+
+        local hitTarget = currentHitbox or currentBossPart
+        local rightHand = char:FindFirstChild("RightHand")
+        local leftHand = char:FindFirstChild("LeftHand")
+
+        if hitTarget and firetouchinterest then
+            if rightHand then
+                firetouchinterest(hitTarget, rightHand, 0)
+                firetouchinterest(hitTarget, rightHand, 1)
+            end
+            if leftHand then
+                firetouchinterest(hitTarget, leftHand, 0)
+                firetouchinterest(hitTarget, leftHand, 1)
+            end
+        end
+
+        PlayerData.Player.muscleEvent:FireServer("punch", "rightHand")
+        PlayerData.Player.muscleEvent:FireServer("punch", "leftHand")
+        PlayerData.Player.muscleEvent:FireServer("punch", "rightHand")
+        PlayerData.Player.muscleEvent:FireServer("punch", "leftHand")
+
+        if punch.Activate then
+            punch:Activate()
+        end
+    end)
+end
+
+local function startPunchLoop()
+    if punchRunning then
+        return
+    end
+    
+    punchRunning = true
+    task.spawn(function()
+        while bossFarmActive do
+            pcall(function()
+                punchBoss()
+            end)
+            task.wait(0.05)
+        end
+        punchRunning = false
+    end)
+end
+
+local function updateBoss()
+    local boss, bossPart, health, maxHealth, hitbox, damageValues = getActiveBoss()
+    
+    if boss and bossPart and health and maxHealth then
+        if currentBoss ~= boss then
+            currentBoss = boss
+            currentBossPart = bossPart
+            currentHitbox = hitbox
+            currentHealth = health
+            currentMaxHealth = maxHealth
+            
+            setupBossListeners(boss)
+            setupDamageListener(damageValues)
+        else
+            currentBossPart = bossPart
+            currentHitbox = hitbox
+            currentHealth = health
+            currentMaxHealth = maxHealth
+            if damageValues then
+                currentDamageValues = damageValues
+                updateDamageDisplay()
+            end
+        end
+        
+        bossSpawnTimeLabel.Text = "Boss Status: Active / Spawned!"
+        local hp = health.Value
+        local maxHp = maxHealth.Value
+        bossHealthLabel.Text = "Boss Health: " .. math.floor(hp) .. " / " .. math.floor(maxHp)
+        
+        if maxHp > 0 then
+            local percent = (hp / maxHp) * 100
+            bossPercentLabel.Text = "Boss Health %: " .. string.format("%.1f", percent) .. "%"
+        else
+            bossPercentLabel.Text = "Boss Health %: 0%"
+        end
+        
+        if bossFarmActive then
+            startMovement()
+            startPunchLoop()
+        end
+        
+        return boss
+    end
+    
+    currentBoss = nil
+    currentBossPart = nil
+    currentHitbox = nil
+    currentHealth = nil
+    currentMaxHealth = nil
+    currentDamageValues = nil
+    
+    bossSpawnTimeLabel.Text = "Boss Status: Waiting to Spawn..."
+    bossHealthLabel.Text = "Boss Health: None"
+    bossPercentLabel.Text = "Boss Health %: 0%"
+    bossDamageLabel.Text = "Your Damage: 0"
+    
+    stopMovement()
+    return nil
+end
+
+task.spawn(function()
+    while true do
+        updateBoss()
+        task.wait(0.1)
+    end
+end)
+
+Tabs.Boss:AddLabel("---------------------")
+
+Tabs.Boss:AddSwitch("💢 Auto Kill Boss", function(state)
+    bossFarmActive = state
+    if state then
+        updateBoss()
+        startMovement()
+        startPunchLoop()
+    else
+        stopMovement()
+    end
+end)
+
+Tabs.Boss:AddSwitch("🎁 Auto Collect Chest", function(state)
+    autoCollectChest = state
+    if not state then
+        return
+    end
+    
+    task.spawn(function()
+        while autoCollectChest do
+            pcall(function()
+                if not currentBoss then
+                    local chestFolder = Services.Workspace:FindFirstChild("BossChest")
+                    if chestFolder then
+                        local prompt = chestFolder:FindFirstChild("bossChestPrompt", true)
+                        local chestPart
+                        
+                        if prompt and prompt:IsA("ProximityPrompt") then
+                            if prompt.Parent and prompt.Parent:IsA("BasePart") then
+                                chestPart = prompt.Parent
+                            end
+                        end
+                        
+                        if not chestPart then
+                            local root = chestFolder:FindFirstChild("Root", true)
+                            if root and root:IsA("BasePart") then
+                                chestPart = root
+                            end
+                        end
+                        
+                        local char = PlayerData.Player.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        
+                        if chestPart and hrp then
+                            hrp.CFrame = CFrame.new(
+                                chestPart.Position + chestPart.CFrame.RightVector * 3 + Vector3.new(0, 1, 0),
+                                chestPart.Position
+                            )
+                            task.wait(0.15)
+                            
+                            if autoCollectChest and not currentBoss then
+                                Services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                task.wait(0.5)
+                                Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(0.2)
+        end
+        
+        Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
+end)
+
 Tabs.Pets:AddLabel("💰 Auto Buy")
 
 local selectedPet = "Orange Hedgehog"
