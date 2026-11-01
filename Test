@@ -76,7 +76,7 @@ library:EnableAntiAFK()
 
 local silence = library:AddWindow("Silence | Fast Farming - " .. greeting(), {
     main_color = Color3.fromRGB(138, 0, 0),
-    min_size = Vector2.new(500, 560),
+    min_size = Vector2.new(100, 250),
     can_resize = true
 })
 
