@@ -63,6 +63,15 @@ services.touchParts = function(part, hand, state)
     return pcall(firetouchinterest, part, hand, state)
 end
 
+local function greeting(hour)
+    hour = hour or os.date("*t").hour
+    if hour >= 6 and hour < 12 then return "Good Morning!"
+    elseif hour >= 12 and hour < 13 then return "Good Noon!"
+    elseif hour >= 13 and hour < 19 then return "Good Afternoon!"
+    elseif hour >= 19 and hour < 22 then return "Good Evening!"
+    else return "Good Night!" end
+end
+
 library:EnableAntiAFK()
 
 local silence = library:AddWindow("Silence | Fast Farming", {
@@ -733,14 +742,14 @@ tabs.strength.timerStarted = false
 tabs.strength.gainedBaselineSet = false
 tabs.strength.statSamples = {Strength = tabs.strength.strength.Value, Durability = tabs.strength.durability.Value}
 tabs.strength.statGains = {Strength = 0, Durability = 0}
-tabs.strength.initialSendRate = 900
-tabs.strength.maxSendRate = 1300
+tabs.strength.initialSendRate = 700
+tabs.strength.maxSendRate = 1100
 tabs.strength.sendRate = math.min(tabs.strength.initialSendRate, tabs.strength.maxSendRate)
-tabs.strength.minSendRate = 700
-tabs.strength.maxBurst = 120
+tabs.strength.minSendRate = 350
+tabs.strength.maxBurst = 100
 tabs.strength.Tokens = 0
-tabs.strength.pingFullSpeed = 700
-tabs.strength.pingHardLimit = 1800
+tabs.strength.pingFullSpeed = 600
+tabs.strength.pingHardLimit = 1500
 tabs.strength.controlInterval = 0.4
 tabs.strength.stallThreshold = 5
 tabs.strength.rampFactor = 1.2
@@ -919,7 +928,7 @@ tabs.strength:AddTextBox("Max reps/s: " .. tabs.strength.maxSendRate, function(i
     tabs.strength.sendRate = math.min(tabs.strength.sendRate, tabs.strength.maxSendRate)
 end, {clear = false})
 
-tabs.strength:AddLabel("Ping-aware: full speed up to 700 ms, floor 700 reps/s at any ping. Recommended: 762+.")
+tabs.strength:AddLabel("Ping-aware: full speed up to 600 ms, floor 350 reps/s at any ping. Recommended: 662+.")
 
 tabs.strength.FastRepToggle = tabs.strength:AddSwitch("Fast Rep", function(state)
     recordStatGain(tabs.strength, "Strength", tabs.strength.strength.Value)
