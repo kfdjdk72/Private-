@@ -2238,6 +2238,11 @@ local stopwatchLabel = Tabs.FastFarming:AddLabel("0d 0h 0m 0s - Fast Rep Inactiv
 stopwatchLabel.TextSize = 15
 stopwatchLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 
+-- Silence Status label (reps/s + ping) — AFK süresinin hemen altına taşındı
+local statusLabel = Tabs.FastFarming:AddLabel("Status: Inactive")
+statusLabel.TextSize = 15
+statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+
 local projectedStrengthLabel = Tabs.FastFarming:AddLabel("Strength: /Min | /Hour | /Day | /Week")
 projectedStrengthLabel.TextSize = 15
 local averageStrengthLabel = Tabs.FastFarming:AddLabel("Average: /Min | /Hour | /Day | /Week")
@@ -2266,6 +2271,7 @@ local calculationInterval = 10
 local initialStrength = strengthStat.Value
 local initialDurability = durabilityStat.Value
 
+-- Fast Rep kapalıyken gelen kazançlar toplanır ve ortalamadan çıkarılır (sadece farm süresi hesaba katılır)
 local pausedSnapshotStrength = initialStrength
 local pausedSnapshotDurability = initialDurability
 local offFarmStrength = 0
@@ -2308,6 +2314,7 @@ task.spawn(function()
                 strengthHistory = {}
                 durabilityHistory = {}
 
+                -- Duraklatma/öncesi aralığında gelen kazançlar "kazanıldı" sayılır, ortalamadan çıkarılır
                 offFarmStrength = offFarmStrength + math.max(0, currentStrength - pausedSnapshotStrength)
                 offFarmDurability = offFarmDurability + math.max(0, currentDurability - pausedSnapshotDurability)
                 pausedSnapshotStrength = currentStrength
@@ -2346,6 +2353,7 @@ task.spawn(function()
                     local firstSample = strengthHistory[1]
                     local lastSample = strengthHistory[#strengthHistory]
                     local sampleSpan = lastSample.time - firstSample.time
+                    -- Hız, penceredeki GERÇEK zaman aralığına bölünür (10 sn varsayımı yok)
                     local strengthPerSecond = sampleSpan > 0 and (lastSample.value - firstSample.value) / sampleSpan or 0
                     savedStrengthPerMin = strengthPerSecond * 60
                     savedStrengthPerHour = strengthPerSecond * 3600
@@ -2368,6 +2376,7 @@ task.spawn(function()
 
                 local totalElapsed = pausedElapsedTime + (currentTime - startTime)
                 if totalElapsed > 0 then
+                    -- Ortalama: sadece farm sırasında kazanılan / toplam farm süresi (duraklatma dışı kazançlar hariç)
                     local avgStrengthPerSecond = math.max(0, currentStrength - initialStrength - offFarmStrength) / totalElapsed
                     savedAvgStrengthPerMin = avgStrengthPerSecond * 60
                     savedAvgStrengthPerHour = avgStrengthPerSecond * 3600
@@ -2448,7 +2457,7 @@ Tabs.FastFarming:AddButton("🔄 Reset Stats", function()
 end)
 
 Tabs.FastFarming:AddLabel("")
-Tabs.FastFarming:AddLabel("Fast Farm:").TextSize = 17
+Tabs.FastFarming:AddLabel("⚡ Fast Farm:").TextSize = 17
 
 local farmRunning = false
 local networkStats = Services.Stats.Network.ServerStatsItem["Data Ping"]
@@ -2461,8 +2470,8 @@ local function getCurrentPing()
 end
 
 local strengthTab = { running = false, workerActive = false, gainedBaselineSet = false }
-strengthTab.initialSendRate = 700
-strengthTab.maxSendRate = 1100
+strengthTab.initialSendRate = 800
+strengthTab.maxSendRate = 1200
 strengthTab.sendRate = math.min(strengthTab.initialSendRate, strengthTab.maxSendRate)
 strengthTab.minSendRate = 350
 strengthTab.maxBurst = 100
@@ -2481,8 +2490,7 @@ strengthTab.stalledIntervals = 0
 strengthTab.lastPing = nil
 strengthTab.LastAt = os.clock()
 
-strengthTab.Status = Tabs.FastFarming:AddLabel("Status: Inactive")
-strengthTab.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
+strengthTab.Status = statusLabel
 
 strengthTab.readPing = getCurrentPing
 
@@ -2598,7 +2606,7 @@ end)
 
 Tabs.FastFarming:AddLabel("Ping-aware: full speed up to 600 ms, floor 350 reps/s at any ping. Recommended: 662+.")
 
-strengthTab.FastRepToggle = Tabs.FastFarming:AddSwitch("💪 Start Farm", function(isEnabled)
+strengthTab.FastRepToggle = Tabs.FastFarming:AddSwitch("💪 Fast Rep", function(isEnabled)
     strengthTab.running = isEnabled
     strengthTab.Tokens = 0
     farmRunning = isEnabled
