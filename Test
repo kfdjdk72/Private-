@@ -748,15 +748,19 @@ tabs.strength.timerStarted = false
 tabs.strength.gainedBaselineSet = false
 tabs.strength.statSamples = {Strength = tabs.strength.strength.Value, Durability = tabs.strength.durability.Value}
 tabs.strength.statGains = {Strength = 0, Durability = 0}
-tabs.strength.initialSendRate = 400
-tabs.strength.maxSendRate = 550
+tabs.strength.initialSendRate = 700
+tabs.strength.maxSendRate = 1100
 tabs.strength.sendRate = math.min(tabs.strength.initialSendRate, tabs.strength.maxSendRate)
-tabs.strength.minSendRate = 150
-tabs.strength.maxBurst = 32
+tabs.strength.minSendRate = 350
+tabs.strength.maxBurst = 100
 tabs.strength.Tokens = 0
-tabs.strength.pingFullSpeed = 400
-tabs.strength.pingHardLimit = 900
-tabs.strength.controlInterval = 0.25
+tabs.strength.pingFullSpeed = 600
+tabs.strength.pingHardLimit = 1500
+tabs.strength.controlInterval = 0.4
+tabs.strength.stallThreshold = 5
+tabs.strength.rampFactor = 1.2
+tabs.strength.rampBonus = 25
+tabs.strength.backoffFactor = 0.9
 tabs.strength.lastControlAt = tick()
 tabs.strength.lastControlStrength = tabs.strength.strength.Value
 tabs.strength.lastControlDurability = tabs.strength.durability.Value
@@ -820,7 +824,7 @@ tabs.strength.updateStatus = function(ping)
         tab.Status.TextColor3 = tab.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
         return
     end
-    if tab.stalledIntervals >= 3 then
+    if tab.stalledIntervals >= tab.stallThreshold then
         tab.Status.Text = "Status: Slowing for server | " .. formatNumber(tab.sendRate) .. " reps/s" .. pingText
         tab.Status.TextColor3 = Color3.fromRGB(255, 180, 70)
     elseif tab.sendRate < tab.pingTargetRate(ping) - 1 then
@@ -848,11 +852,11 @@ tabs.strength.updateAdaptiveRate = function()
 
     if progressed then
         tab.stalledIntervals = 0
-        tab.sendRate = math.min(target, tab.sendRate * 1.15 + 10)
+        tab.sendRate = math.min(target, tab.sendRate * tab.rampFactor + tab.rampBonus)
     else
         tab.stalledIntervals = tab.stalledIntervals + 1
-        if tab.stalledIntervals >= 3 then
-            tab.sendRate = math.max(floorRate, tab.sendRate * 0.75)
+        if tab.stalledIntervals >= tab.stallThreshold then
+            tab.sendRate = math.max(floorRate, tab.sendRate * tab.backoffFactor)
         end
     end
 
@@ -930,7 +934,7 @@ tabs.strength:AddTextBox("Max reps/s: " .. tabs.strength.maxSendRate, function(i
     tabs.strength.sendRate = math.min(tabs.strength.sendRate, tabs.strength.maxSendRate)
 end, {clear = false})
 
-tabs.strength:AddLabel("Ping-aware: full speed up to 400 ms, floor 150 reps/s at any ping. Recommended: 462+.")
+tabs.strength:AddLabel("Ping-aware: full speed up to 600 ms, floor 350 reps/s at any ping. Recommended: 662+.")
 
 tabs.strength.FastRepToggle = tabs.strength:AddSwitch("Fast Rep", function(state)
     recordStatGain(tabs.strength, "Strength", tabs.strength.strength.Value)
