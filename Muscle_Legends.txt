@@ -2240,7 +2240,8 @@ local function formatRate(ratePerSecond)
     return formatNumber(ratePerSecond) .. "/s | "
         .. formatNumber(ratePerSecond * 60) .. "/min | "
         .. formatNumber(ratePerSecond * 3600) .. "/h | "
-        .. formatNumber(ratePerSecond * 86400) .. "/d"
+        .. formatNumber(ratePerSecond * 86400) .. "/d | "
+        .. formatNumber(ratePerSecond * 604800) .. "/w"
 end
 
 local function getElapsed(tab)
@@ -2278,8 +2279,8 @@ local function resetCalculations(tab)
     end
     tab.statSamples.Strength = tab.strength.Value
     tab.statSamples.Durability = tab.durability.Value
-    tab.StrengthAverage.Text = "Str Ø: --/s | --/min | --/h | --/d"
-    tab.DurabilityAverage.Text = "Dura Ø: --/s | --/min | --/h | --/d"
+    tab.StrengthAverage.Text = "Strenght : --/s | --/min | --/h | --/d | --/w"
+    tab.DurabilityAverage.Text = "Dura : --/s | --/min | --/h | --/d | --/w"
     tab.updateStats()
     tab.updateRuntime()
 end
@@ -2344,11 +2345,11 @@ strengthTab.StrengthStats = strengthTab:AddLabel("Strength: " .. formatCurrentSt
 strengthTab.StrengthStats:SetAttribute("EleriumUpdateInterval", 0.02)
 strengthTab.DurabilityStats = strengthTab:AddLabel("Durability: " .. formatCurrentStat(strengthTab.durability.Value) .. " | Gained: 0")
 strengthTab.DurabilityStats:SetAttribute("EleriumUpdateInterval", 0.02)
-strengthTab.StrengthAverage = strengthTab:AddLabel("Str Ø: --/s | --/min | --/h | --/d")
-strengthTab.DurabilityAverage = strengthTab:AddLabel("Dura Ø: --/s | --/min | --/h | --/d")
+strengthTab.StrengthAverage = strengthTab:AddLabel("Strenght : --/s | --/min | --/h | --/d | --/w")
+strengthTab.DurabilityAverage = strengthTab:AddLabel("Dura : --/s | --/min | --/h | --/d | --/w")
 strengthTab.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 
-strengthTab:AddButton("Reset Calcs", function()
+strengthTab:AddButton("🔄 Reset Calcs", function()
     resetCalculations(strengthTab)
 end)
 
@@ -2368,8 +2369,8 @@ end
 strengthTab.updateAverage = function()
     local elapsed = getElapsed(strengthTab)
     if elapsed <= 0 then return end
-    strengthTab.StrengthAverage.Text = "Str Ø: " .. formatRate(strengthTab.statGains.Strength / elapsed)
-    strengthTab.DurabilityAverage.Text = "Dura Ø: " .. formatRate(strengthTab.statGains.Durability / elapsed)
+    strengthTab.StrengthAverage.Text = "Strenght : " .. formatRate(strengthTab.statGains.Strength / elapsed)
+    strengthTab.DurabilityAverage.Text = "Dura : " .. formatRate(strengthTab.statGains.Durability / elapsed)
 end
 
 strengthTab.readPing = readDataPing
@@ -2497,7 +2498,7 @@ end, {clear = false})
 
 strengthTab:AddLabel("Ping-aware: full speed up to 600 ms, floor 350 reps/s at any ping. Recommended: 662+.")
 
-strengthTab.FastRepToggle = strengthTab:AddSwitch("Fast Rep", function(state)
+strengthTab.FastRepToggle = strengthTab:AddSwitch("💪 Fast Rep", function(state)
     recordStatGain(strengthTab, "Strength", strengthTab.strength.Value)
     recordStatGain(strengthTab, "Durability", strengthTab.durability.Value)
     setTimerRunning(strengthTab, false)
