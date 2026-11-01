@@ -2266,7 +2266,6 @@ local calculationInterval = 10
 local initialStrength = strengthStat.Value
 local initialDurability = durabilityStat.Value
 
--- Fast Rep kapalıyken gelen kazançlar toplanır ve ortalamadan çıkarılır (sadece farm süresi hesaba katılır)
 local pausedSnapshotStrength = initialStrength
 local pausedSnapshotDurability = initialDurability
 local offFarmStrength = 0
@@ -2309,7 +2308,6 @@ task.spawn(function()
                 strengthHistory = {}
                 durabilityHistory = {}
 
-                -- Duraklatma/öncesi aralığında gelen kazançlar "kazanıldı" sayılır, ortalamadan çıkarılır
                 offFarmStrength = offFarmStrength + math.max(0, currentStrength - pausedSnapshotStrength)
                 offFarmDurability = offFarmDurability + math.max(0, currentDurability - pausedSnapshotDurability)
                 pausedSnapshotStrength = currentStrength
@@ -2348,7 +2346,6 @@ task.spawn(function()
                     local firstSample = strengthHistory[1]
                     local lastSample = strengthHistory[#strengthHistory]
                     local sampleSpan = lastSample.time - firstSample.time
-                    -- Hız, penceredeki GERÇEK zaman aralığına bölünür (10 sn varsayımı yok)
                     local strengthPerSecond = sampleSpan > 0 and (lastSample.value - firstSample.value) / sampleSpan or 0
                     savedStrengthPerMin = strengthPerSecond * 60
                     savedStrengthPerHour = strengthPerSecond * 3600
@@ -2371,7 +2368,6 @@ task.spawn(function()
 
                 local totalElapsed = pausedElapsedTime + (currentTime - startTime)
                 if totalElapsed > 0 then
-                    -- Ortalama: sadece farm sırasında kazanılan / toplam farm süresi (duraklatma dışı kazançlar hariç)
                     local avgStrengthPerSecond = math.max(0, currentStrength - initialStrength - offFarmStrength) / totalElapsed
                     savedAvgStrengthPerMin = avgStrengthPerSecond * 60
                     savedAvgStrengthPerHour = avgStrengthPerSecond * 3600
@@ -2452,7 +2448,7 @@ Tabs.FastFarming:AddButton("🔄 Reset Stats", function()
 end)
 
 Tabs.FastFarming:AddLabel("")
-Tabs.FastFarming:AddLabel("⚡ Fast Farm:").TextSize = 17
+Tabs.FastFarming:AddLabel("Fast Farm:").TextSize = 17
 
 local farmRunning = false
 local networkStats = Services.Stats.Network.ServerStatsItem["Data Ping"]
@@ -2602,7 +2598,7 @@ end)
 
 Tabs.FastFarming:AddLabel("Ping-aware: full speed up to 600 ms, floor 350 reps/s at any ping. Recommended: 662+.")
 
-strengthTab.FastRepToggle = Tabs.FastFarming:AddSwitch("💪 Fast Rep", function(isEnabled)
+strengthTab.FastRepToggle = Tabs.FastFarming:AddSwitch("💪 Start Farm", function(isEnabled)
     strengthTab.running = isEnabled
     strengthTab.Tokens = 0
     farmRunning = isEnabled
