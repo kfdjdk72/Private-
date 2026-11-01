@@ -74,18 +74,12 @@ end
 
 library:EnableAntiAFK()
 
-local silence = library:AddWindow("Silence | Fast Farming - " .. greeting(), {
+local silence = library:AddWindow("Silence | Fast Farming", {
     main_color = Color3.fromRGB(138, 0, 0),
-    min_size = Vector2.new(50, 50),
+    size = Vector2.new(150, 100),
+    min_size = Vector2.new(150, 100),
     can_resize = true
 })
-
-runtime:Spawn(function()
-    while true do
-        task.wait(60)
-        silence:SetTitle("Silence | Fast Farming - " .. greeting())
-    end
-end)
 
 local tabs = {
     rebirths = silence:AddTab("Rebirths"),
