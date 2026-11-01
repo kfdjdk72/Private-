@@ -2428,9 +2428,97 @@ strengthTab.lastControlDurability = durabilityStat.Value
 strengthTab.stalledIntervals = 0
 strengthTab.lastPing = nil
 strengthTab.LastAt = os.clock()
+strengthTab.startedAt = 0
+strengthTab.totalElapsed = 0
+strengthTab.timerStarted = false
+strengthTab.gainedBaselineSet = false
+strengthTab.nextAverageElapsed = 10
+strengthTab.statSamples = {Strength = strengthStat.Value, Durability = durabilityStat.Value}
+strengthTab.statGains = {Strength = 0, Durability = 0}
+
+local function formatCurrentStat(value)
+    return formatNumber(value)
+end
+
+local function formatRate(ratePerSecond)
+    return formatNumber(ratePerSecond) .. "/s | "
+        .. formatNumber(ratePerSecond * 60) .. "/min | "
+        .. formatNumber(ratePerSecond * 3600) .. "/h | "
+        .. formatNumber(ratePerSecond * 86400) .. "/d"
+end
+
+local function getElapsed(tab)
+    return tab.totalElapsed + (tab.timerStarted and os.clock() - tab.startedAt or 0)
+end
+
+local function setTimerRunning(tab, enabled)
+    tab.totalElapsed = getElapsed(tab)
+    tab.startedAt = os.clock()
+    tab.timerStarted = enabled
+end
+
+local function recordStatGain(tab, key, value)
+    local previous = tab.statSamples[key]
+    tab.statSamples[key] = value
+    if tab.running and tab.timerStarted and previous then
+        tab.statGains[key] = tab.statGains[key] + math.max(0, value - previous)
+    end
+end
+
+local function updateRuntimeLabel(tab)
+    local elapsed = getElapsed(tab)
+    tab.Runtime.Text = string.format("Runtime: %dd %dh %dm %ds",
+        math.floor(elapsed / 86400), math.floor(elapsed % 86400 / 3600),
+        math.floor(elapsed % 3600 / 60), math.floor(elapsed % 60))
+end
+
+local function resetCalculations(tab)
+    tab.totalElapsed = 0
+    tab.startedAt = os.clock()
+    tab.timerStarted = tab.running and tab.timerStarted
+    tab.nextAverageElapsed = 10
+    for key in pairs(tab.statGains) do
+        tab.statGains[key] = 0
+    end
+    tab.statSamples.Strength = strengthStat.Value
+    tab.statSamples.Durability = durabilityStat.Value
+    tab.StrengthAverage.Text = "Str Ø: --/s | --/min | --/h | --/d"
+    tab.DurabilityAverage.Text = "Dura Ø: --/s | --/min | --/h | --/d"
+    tab.updateStats()
+    tab.updateRuntime()
+end
 
 strengthTab.Status = Tabs.FastFarming:AddLabel("Status: Inactive")
 strengthTab.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
+strengthTab.Runtime = Tabs.FastFarming:AddLabel("Runtime: 0d 0h 0m 0s")
+strengthTab.StrengthStats = Tabs.FastFarming:AddLabel("Strength: " .. formatCurrentStat(strengthStat.Value) .. " | Gained: 0")
+strengthTab.DurabilityStats = Tabs.FastFarming:AddLabel("Durability: " .. formatCurrentStat(durabilityStat.Value) .. " | Gained: 0")
+strengthTab.StrengthAverage = Tabs.FastFarming:AddLabel("Str Ø: --/s | --/min | --/h | --/d")
+strengthTab.DurabilityAverage = Tabs.FastFarming:AddLabel("Dura Ø: --/s | --/min | --/h | --/d")
+
+strengthTab.updateStats = function()
+    strengthTab.StrengthStats.Text = "Strength: " .. formatCurrentStat(strengthStat.Value)
+        .. " | Gained: " .. (strengthTab.running and not strengthTab.timerStarted
+            and "Preparing" or formatNumber(strengthTab.statGains.Strength))
+    strengthTab.DurabilityStats.Text = "Durability: " .. formatCurrentStat(durabilityStat.Value)
+        .. " | Gained: " .. (strengthTab.running and not strengthTab.timerStarted
+            and "Preparing" or formatNumber(strengthTab.statGains.Durability))
+end
+
+strengthTab.updateRuntime = function()
+    updateRuntimeLabel(strengthTab)
+end
+
+strengthTab.updateAverage = function()
+    local elapsed = getElapsed(strengthTab)
+    if elapsed <= 0 then return end
+    strengthTab.StrengthAverage.Text = "Str Ø: " .. formatRate(strengthTab.statGains.Strength / elapsed)
+    strengthTab.DurabilityAverage.Text = "Dura Ø: " .. formatRate(strengthTab.statGains.Durability / elapsed)
+end
+
+Tabs.FastFarming:AddButton("Reset Calcs", function()
+    resetCalculations(strengthTab)
+end)
 
 strengthTab.readPing = getCurrentPing
 
@@ -2505,6 +2593,16 @@ local function sendTrainingReps(state, rate, maxBurst, canSend)
     return sent
 end
 
+strengthTab.startMeasurement = function()
+    local tab = strengthTab
+    if not tab.running or tab.timerStarted then return end
+    tab.statSamples.Strength = strengthStat.Value
+    tab.statSamples.Durability = durabilityStat.Value
+    setTimerRunning(tab, true)
+    tab.nextAverageElapsed = getElapsed(tab) + 10
+    tab.updateStats()
+end
+
 local function strengthWorkerLoop()
     strengthTab.LastAt = os.clock()
     local function isRunning()
@@ -2512,6 +2610,7 @@ local function strengthWorkerLoop()
     end
     while strengthTab.running do
         strengthTab.updateAdaptiveRate()
+        strengthTab.startMeasurement()
         sendTrainingReps(strengthTab, strengthTab.sendRate, strengthTab.maxBurst, isRunning)
         Services.RunService.Heartbeat:Wait()
     end
@@ -2528,6 +2627,12 @@ Tabs.FastFarming:AddTextBox("Max reps/s: " .. strengthTab.maxSendRate, function(
     local value = tonumber(inputText)
     if not value or value ~= value or value == math.huge or value == -math.huge then return end
     value = math.max(1, value)
+    if value ~= strengthTab.maxSendRate and strengthTab.running then
+        recordStatGain(strengthTab, "Strength", strengthStat.Value)
+        recordStatGain(strengthTab, "Durability", durabilityStat.Value)
+        setTimerRunning(strengthTab, false)
+        strengthTab.updateStats()
+    end
     strengthTab.maxSendRate = value
     strengthTab.sendRate = math.min(strengthTab.sendRate, strengthTab.maxSendRate)
 end)
@@ -2535,12 +2640,18 @@ end)
 Tabs.FastFarming:AddLabel("Ping-aware: full speed up to 700 ms, floor 700 reps/s at any ping. Recommended: 762+.")
 
 strengthTab.FastRepToggle = Tabs.FastFarming:AddSwitch("💪 Fast Rep", function(isEnabled)
+    recordStatGain(strengthTab, "Strength", strengthStat.Value)
+    recordStatGain(strengthTab, "Durability", durabilityStat.Value)
+    setTimerRunning(strengthTab, false)
+    strengthTab.statSamples.Strength = strengthStat.Value
+    strengthTab.statSamples.Durability = durabilityStat.Value
     farmRunning = isEnabled
     strengthTab.running = isEnabled
     strengthTab.Tokens = 0
     if isEnabled then
         runFastRep = true
         strengthTab.hasStarted = true
+        strengthTab.gainedBaselineSet = true
         strengthTab.sendRate = math.min(strengthTab.initialSendRate, strengthTab.maxSendRate)
         strengthTab.LastAt = os.clock()
         strengthTab.lastControlAt = tick()
@@ -2551,16 +2662,32 @@ strengthTab.FastRepToggle = Tabs.FastFarming:AddSwitch("💪 Fast Rep", function
     else
         runFastRep = false
     end
+    strengthTab.updateStats()
     strengthTab.updateStatus(strengthTab.readPing())
 end)
 strengthTab.FastRepToggle:Set(false)
 
+strengthStat:GetPropertyChangedSignal("Value"):Connect(function()
+    recordStatGain(strengthTab, "Strength", strengthStat.Value)
+    strengthTab.updateStats()
+end)
+
+durabilityStat:GetPropertyChangedSignal("Value"):Connect(function()
+    recordStatGain(strengthTab, "Durability", durabilityStat.Value)
+    strengthTab.updateStats()
+end)
+
 task.spawn(function()
     local statusTicks = 0
     while true do
+        strengthTab.updateRuntime()
         statusTicks = statusTicks + 1
         if not strengthTab.running and statusTicks % 5 == 0 then
             strengthTab.updateStatus(getCurrentPing())
+        end
+        if strengthTab.timerStarted and getElapsed(strengthTab) >= strengthTab.nextAverageElapsed then
+            strengthTab.updateAverage()
+            strengthTab.nextAverageElapsed = getElapsed(strengthTab) + 10
         end
         task.wait(0.1)
     end
