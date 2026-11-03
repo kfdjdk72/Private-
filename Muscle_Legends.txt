@@ -3974,7 +3974,7 @@ local switch = Tabs.Misc:AddSwitch("🔒 Lock Position", function(Value)
     end
 end)
 
-Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel", function(Value)
+Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel v31", function(Value)
     State.autoHalloweenFortuneWheelActive = Value
     if Value then
         task.spawn(function()
@@ -3985,15 +3985,12 @@ Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel", function(Value)
                     local wheelRemote = rEvents and rEvents:FindFirstChild("halloweenWheelRemote")
                     
                     if wheelRemote then
-                        -- Farklı olası argüman kombinasyonlarını sırayla dener
+                        -- Testte başarılı olan "openFortuneWheel" argümanını kullanıyoruz
                         wheelRemote:InvokeServer("openFortuneWheel")
-                        task.wait(0.1)
-                        wheelRemote:InvokeServer("spinWheel")
-                        task.wait(0.1)
-                        wheelRemote:InvokeServer("openWheel")
                     end
                 end)
-                task.wait(1)
+                -- Çarkın cooldown (bekleme) süresine göre buradaki saniyeyi ayarlayabilirsin
+                task.wait(1) 
             end
         end)
     end
