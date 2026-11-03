@@ -3974,7 +3974,7 @@ local switch = Tabs.Misc:AddSwitch("🔒 Lock Position", function(Value)
     end
 end)
 
-Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel v2", function(Value)
+Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel", function(Value)
     State.autoHalloweenFortuneWheelActive = Value
     if Value then
         task.spawn(function()
@@ -3982,31 +3982,18 @@ Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel v2", function(Value)
                 pcall(function()
                     local ReplicatedStorage = Services.ReplicatedStorage
                     local rEvents = ReplicatedStorage:FindFirstChild("rEvents")
-                    
-                    -- Konsolda bulduğumuz doğru RemoteFunction ismi
                     local wheelRemote = rEvents and rEvents:FindFirstChild("halloweenWheelRemote")
                     
-                    -- Çark şans verisini veya doğrudan argümanı ayarlıyoruz
-                    local shared = ReplicatedStorage:FindFirstChild("shared")
-                    local catalogs = shared and shared:FindFirstChild("catalogs")
-                    local wheelChances = catalogs and catalogs:FindFirstChild("fortuneWheelChances")
-                    
-                    local wheelChance = wheelChances and (
-                        wheelChances:FindFirstChild("Halloween Fortune Wheel") 
-                        or wheelChances:FindFirstChild("Halloween")
-                        or wheelChances:GetChildren()[1] -- Bulamazsa ilkini seçer
-                    )
-                    
                     if wheelRemote then
-                        if wheelChance then
-                            wheelRemote:InvokeServer("openFortuneWheel", wheelChance)
-                        else
-                            -- Eğer katalog verisi gerekmiyorsa doğrudan tetikler
-                            wheelRemote:InvokeServer("openFortuneWheel")
-                        end
+                        -- Farklı olası argüman kombinasyonlarını sırayla dener
+                        wheelRemote:InvokeServer("openFortuneWheel")
+                        task.wait(0.1)
+                        wheelRemote:InvokeServer("spinWheel")
+                        task.wait(0.1)
+                        wheelRemote:InvokeServer("openWheel")
                     end
                 end)
-                task.wait(0.5)
+                task.wait(1)
             end
         end)
     end
