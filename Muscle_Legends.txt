@@ -3981,18 +3981,29 @@ Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel", function(Value)
             while State.autoHalloweenFortuneWheelActive do
                 pcall(function()
                     local ReplicatedStorage = Services.ReplicatedStorage
-                    -- Halloween çarkı için remote ismi (gerekirse oyununa göre "openHalloweenWheelRemote" vb. yapabilirsin)
-                    local wheelRemote = ReplicatedStorage.rEvents:FindFirstChild("openHalloweenFortuneWheelRemote") 
-                        or ReplicatedStorage.rEvents:FindFirstChild("openFortuneWheelRemote")
+                    local rEvents = ReplicatedStorage:FindFirstChild("rEvents")
                     
-                    local wheelChance = ReplicatedStorage:FindFirstChild("shared") 
-                        and ReplicatedStorage.shared:FindFirstChild("catalogs") 
-                        and ReplicatedStorage.shared.catalogs:FindFirstChild("fortuneWheelChances")
-                        and (ReplicatedStorage.shared.catalogs.fortuneWheelChances:FindFirstChild("Halloween Fortune Wheel") 
-                             or ReplicatedStorage.shared.catalogs.fortuneWheelChances:FindFirstChild("Fortune Wheel"))
+                    -- Konsolda bulduğumuz doğru RemoteFunction ismi
+                    local wheelRemote = rEvents and rEvents:FindFirstChild("halloweenWheelRemote")
                     
-                    if wheelRemote and wheelChance then
-                        wheelRemote:InvokeServer("openFortuneWheel", wheelChance)
+                    -- Çark şans verisini veya doğrudan argümanı ayarlıyoruz
+                    local shared = ReplicatedStorage:FindFirstChild("shared")
+                    local catalogs = shared and shared:FindFirstChild("catalogs")
+                    local wheelChances = catalogs and catalogs:FindFirstChild("fortuneWheelChances")
+                    
+                    local wheelChance = wheelChances and (
+                        wheelChances:FindFirstChild("Halloween Fortune Wheel") 
+                        or wheelChances:FindFirstChild("Halloween")
+                        or wheelChances:GetChildren()[1] -- Bulamazsa ilkini seçer
+                    )
+                    
+                    if wheelRemote then
+                        if wheelChance then
+                            wheelRemote:InvokeServer("openFortuneWheel", wheelChance)
+                        else
+                            -- Eğer katalog verisi gerekmiyorsa doğrudan tetikler
+                            wheelRemote:InvokeServer("openFortuneWheel")
+                        end
                     end
                 end)
                 task.wait(0.5)
