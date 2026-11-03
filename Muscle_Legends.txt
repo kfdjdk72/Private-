@@ -3974,7 +3974,7 @@ local switch = Tabs.Misc:AddSwitch("🔒 Lock Position", function(Value)
     end
 end)
 
-Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel", function(Value)
+Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel v2", function(Value)
     State.autoHalloweenFortuneWheelActive = Value
     if Value then
         task.spawn(function()
