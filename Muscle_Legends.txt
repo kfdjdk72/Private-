@@ -3974,6 +3974,33 @@ local switch = Tabs.Misc:AddSwitch("🔒 Lock Position", function(Value)
     end
 end)
 
+Tabs.Misc:AddSwitch("🎃 Auto Halloween Fortune Wheel", function(Value)
+    State.autoHalloweenFortuneWheelActive = Value
+    if Value then
+        task.spawn(function()
+            while State.autoHalloweenFortuneWheelActive do
+                pcall(function()
+                    local ReplicatedStorage = Services.ReplicatedStorage
+                    -- Halloween çarkı için remote ismi (gerekirse oyununa göre "openHalloweenWheelRemote" vb. yapabilirsin)
+                    local wheelRemote = ReplicatedStorage.rEvents:FindFirstChild("openHalloweenFortuneWheelRemote") 
+                        or ReplicatedStorage.rEvents:FindFirstChild("openFortuneWheelRemote")
+                    
+                    local wheelChance = ReplicatedStorage:FindFirstChild("shared") 
+                        and ReplicatedStorage.shared:FindFirstChild("catalogs") 
+                        and ReplicatedStorage.shared.catalogs:FindFirstChild("fortuneWheelChances")
+                        and (ReplicatedStorage.shared.catalogs.fortuneWheelChances:FindFirstChild("Halloween Fortune Wheel") 
+                             or ReplicatedStorage.shared.catalogs.fortuneWheelChances:FindFirstChild("Fortune Wheel"))
+                    
+                    if wheelRemote and wheelChance then
+                        wheelRemote:InvokeServer("openFortuneWheel", wheelChance)
+                    end
+                end)
+                task.wait(0.5)
+            end
+        end)
+    end
+end)
+
 Tabs.Misc:AddSwitch("🎰 Auto Fortune Wheel", function(Value)
     State.autoFortuneWheelActive = Value
     if Value then
