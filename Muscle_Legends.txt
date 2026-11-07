@@ -3039,7 +3039,7 @@ Tabs.Boss.Halloween = {
 		Running = false,
 		Generation = 0,
 		Phase = "Waiting",
-		PunchInterval = 0.05,
+		PunchInterval = 0.01,
 		LastPunch = 0,
 		AttackSequence = nil,
 		EvadeUntil = 0,
@@ -3224,7 +3224,7 @@ Tabs.Boss.Halloween.attack = function(target)
 
 	local punch = char:FindFirstChild("Punch") or PlayerData.Player.Backpack:FindFirstChild("Punch")
 	if punch and punch.Parent ~= char then humanoid:EquipTool(punch) end
-
+	
 	if evadeMode ~= "Punch" then
 		local center = Tabs.Boss.Halloween.getBossHeadPosition(target, hitbox)
 		root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
@@ -3249,6 +3249,13 @@ Tabs.Boss.Halloween.attack = function(target)
 	if os.clock() - Tabs.Boss.Halloween.Data.LastPunch >= Tabs.Boss.Halloween.Data.PunchInterval then
 		Tabs.Boss.Halloween.Data.LastPunch = os.clock()
 		pcall(function()
+			if punch then
+				punch.Parent = char
+				if punch:FindFirstChild("attackTime") then 
+					punch.attackTime.Value = 0 
+				end
+				punch:Activate()
+			end
 			Services.muscleEvent:FireServer("punch", "rightHand")
 			Services.muscleEvent:FireServer("punch", "leftHand")
 			Services.muscleEvent:FireServer("punch", "rightHand")
@@ -3257,7 +3264,7 @@ Tabs.Boss.Halloween.attack = function(target)
 	end
 end
 
-Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Halloween Boss", function(state)
+Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Kill Halloween Boss", function(state)
 	if state and Boss.FarmActive and Tabs.Boss.AutoKillToggle then
 		Tabs.Boss.AutoKillToggle:Set(false)
 	end
@@ -3297,7 +3304,7 @@ Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Halloween Bo
 					Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Halloween Boss"
 				end
 			end)
-			task.wait(Tabs.Boss.Halloween.Data.Target and 0.03 or 0.25)
+			task.wait(Tabs.Boss.Halloween.Data.Target and 0.01 or 0.25)
 		end
 	end, Tabs.Boss.Halloween.Data.Generation)
 end)
