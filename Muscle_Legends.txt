@@ -95,7 +95,7 @@ local window = library:AddWindow("Syniox Public | Muscle Legends || HELLO - ".. 
     }, 
     background_transparency = 0.1, 
     main_color = Color3.fromRGB(160, 0, 0), 
-    min_size = Vector2.new(450, 330), 
+    min_size = Vector2.new(500, 330), 
     can_resize = true 
 })
 
