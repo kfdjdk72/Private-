@@ -1845,6 +1845,12 @@ local PETS = {
         durability = 0,
         rebirth = 2,
     },
+["Eclipse Devourer"] = {
+		repSpeed = 0,
+		strength = 0,
+		durability = 0,
+		rebirth = 2,
+	},
 	["Inferno Unicorn"] = {
 		repSpeed = 0,
 		strength = 25,
@@ -2238,10 +2244,11 @@ local function formatCurrentStat(value)
 end
 
 local function formatRate(ratePerSecond)
-    return formatNumber(ratePerSecond) .. "/s | "
-        .. formatNumber(ratePerSecond * 60) .. "/min | "
-        .. formatNumber(ratePerSecond * 3600) .. "/h | "
-        .. formatNumber(ratePerSecond * 86400) .. "/d"
+    return formatNumber(ratePerSecond) .. "/S | "
+        .. formatNumber(ratePerSecond * 60) .. "/Min | "
+        .. formatNumber(ratePerSecond * 3600) .. "/Hour | "
+        .. formatNumber(ratePerSecond * 86400) .. "/Day | "
+        .. formatNumber(ratePerSecond * 604800) .. "/Week"
 end
 
 local function getElapsed(tab)
@@ -2280,8 +2287,8 @@ local function resetCalculations(tab)
     for key, stat in pairs({Strength = tab.strength, Durability = tab.durability}) do
         if tab.statSamples[key] ~= nil then tab.statSamples[key] = stat.Value end
     end
-    tab.StrengthAverage.Text = "Str : --/s | --/min | --/h | --/d"
-    tab.DurabilityAverage.Text = "Dura : --/s | --/min | --/h | --/d"
+    tab.StrengthAverage.Text = "Strenght : --/S | --/Min | --/Hour | --/Day | --/Week"
+    tab.DurabilityAverage.Text = "Durabilty : --/S | --/Min | --/Hour | --/Day | --/Week"
     tab.updateStats()
     tab.updateRuntime()
 end
@@ -2347,8 +2354,8 @@ StrengthTab.Status = Tabs.FastFarming:AddLabel("Status: Inactive")
 StrengthTab.Runtime = Tabs.FastFarming:AddLabel("Runtime: 0d 0h 0m 0s")
 StrengthTab.StrengthStats = Tabs.FastFarming:AddLabel("Strength: " .. formatCurrentStat(strengthStat.Value) .. " | Gained: 0")
 StrengthTab.DurabilityStats = Tabs.FastFarming:AddLabel("Durability: " .. formatCurrentStat(durabilityStat.Value) .. " | Gained: 0")
-StrengthTab.StrengthAverage = Tabs.FastFarming:AddLabel("Str : --/s | --/min | --/h | --/d")
-StrengthTab.DurabilityAverage = Tabs.FastFarming:AddLabel("Dura : --/s | --/min | --/h | --/d")
+StrengthTab.StrengthAverage = Tabs.FastFarming:AddLabel("Str : --/S | --/Min | --/Hour | --/Day | --/Week")
+StrengthTab.DurabilityAverage = Tabs.FastFarming:AddLabel("Dura : --/S | --/Min | --/Hour | --/Day | --/Week")
 StrengthTab.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 
 Tabs.FastFarming:AddButton("Reset Calcs (Strength)", function()
@@ -2499,8 +2506,6 @@ Tabs.FastFarming:AddTextBox("Max reps/s (Strength): " .. StrengthTab.maxSendRate
     StrengthTab.maxSendRate = value
     StrengthTab.sendRate = math.min(StrengthTab.sendRate, StrengthTab.maxSendRate)
 end)
-
-Tabs.FastFarming:AddLabel("Ping-aware: full speed up to 600 ms, floor 350 reps/s at any ping. Recommended: 662+.")
 
 StrengthTab.FastRepToggle = Tabs.FastFarming:AddSwitch("💪 Start Farm", function(state)
     recordStatGain(StrengthTab, "Strength", strengthStat.Value)
