@@ -3025,11 +3025,8 @@ Tabs.Boss.AutoKillToggle = Tabs.Boss:AddSwitch("💢 Auto Kill Boss", function(s
     end
 end)
 
-Tabs.Boss:AddLabel("---------------------")
-Tabs.Boss:AddLabel("🎃 Halloween Boss Farm")
-
 Tabs.Boss:AddLabel("")
-Tabs.Boss:AddHeading("Halloween Boss Farming:")
+Tabs.Boss:AddLabel("🎃 Halloween Boss Farming")
 
 Tabs.Boss.Halloween = {
 	runtime = {},
@@ -3109,7 +3106,10 @@ Tabs.Boss.Halloween.findActiveBoss = function(selectedOnly)
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local bestModel, bestHitbox, closestDistance = nil, nil, math.huge
 
-	for _, candidate in ipairs(Services.CollectionService:GetTagged("HalloweenBoss")) do
+	-- CollectionService Syniox'ta tanımlı olmadığı için direkt game:GetService ile çekiyoruz
+	local CollectionService = game:GetService("CollectionService")
+
+	for _, candidate in ipairs(CollectionService:GetTagged("HalloweenBoss")) do
 		if candidate:IsA("Model") and candidate:IsDescendantOf(workspace)
 			and Tabs.Boss.Halloween.getBossHealth(nil, candidate) > 0
 			and (not selectedOnly or Tabs.Boss.Halloween.shouldFarmBoss(candidate)) then
@@ -3149,7 +3149,7 @@ task.spawn(function()
 	end
 end)
 
--- Halloween boss kesme fonksiyonu (Silence'taki punch mantığı)
+-- Halloween boss kesme fonksiyonu
 Tabs.Boss.Halloween.attack = function(target)
 	if not target or not target.Parent then return end
 	local char = PlayerData.Player.Character
@@ -3216,15 +3216,15 @@ Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Farm Hallowe
 	task.spawn(function(generation)
 		while Tabs.Boss.Halloween.Data.Running and Tabs.Boss.Halloween.Data.Generation == generation do
 			pcall(function()
-				local model, hitbox = Tabs.Boss.Halloween.findActiveBoss(true)
-				if model then
-					Tabs.Boss.Halloween.Data.Target = model
+				local targetModel, targetHitbox = Tabs.Boss.Halloween.findActiveBoss(true)
+				if targetModel then
+					Tabs.Boss.Halloween.Data.Target = targetModel
 					Tabs.Boss.Halloween.Data.Phase = "Fighting"
 					if PlayerData.Player.Character
 						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid")
 						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
 						Tabs.Boss.Halloween.StatusLabel.Text = "Status: Fighting"
-						Tabs.Boss.Halloween.attack(model)
+						Tabs.Boss.Halloween.attack(targetModel)
 					else
 						Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Respawn"
 					end
@@ -3234,7 +3234,7 @@ Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Farm Hallowe
 					Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Halloween Boss"
 				end
 			end)
-			task.wait(model and 0.03 or 0.25)
+			task.wait(Tabs.Boss.Halloween.Data.Target and 0.03 or 0.25)
 		end
 	end, Tabs.Boss.Halloween.Data.Generation)
 end)
