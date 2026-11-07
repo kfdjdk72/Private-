@@ -3014,8 +3014,6 @@ task.spawn(function()
     end
 end)
 
-Tabs.Boss:AddLabel("---------------------")
-
 Tabs.Boss.AutoKillToggle = Tabs.Boss:AddSwitch("💢 Auto Kill Boss", function(state)
     Boss.FarmActive = state
     if state then
@@ -3030,169 +3028,132 @@ end)
 Tabs.Boss:AddLabel("---------------------")
 Tabs.Boss:AddLabel("🎃 Halloween Boss Farm")
 
+Tabs.Boss:AddLabel("")
+Tabs.Boss:AddHeading("Halloween Boss Farming:")
+
 Tabs.Boss.Halloween = {
-	Running = false,
-	Generation = 0,
-	Target = nil,
-	PunchRunning = false,
-	MovementConnection = nil,
-	LastPunch = 0,
-	PunchInterval = 0.05,
-	ContinueFarming = true,
-	PausedStrength = false,
-	PausedRebirth = false,
-	Bosses = {
-		GrimReaper = "Grim Reaper",
-		FrankenBrute = "Frankenbrute",
-		PumpkinTitan = "Pumpkin Titan",
-		ScarecrowColossus = "Scarecrow Colossus"
-	},
-	BossOrder = {"GrimReaper", "FrankenBrute", "PumpkinTitan", "ScarecrowColossus"},
-	Selected = {}
+	runtime = {},
+	BossLabelPrefix = "Halloween Boss: ",
+	StatusLabel = Tabs.Boss:AddLabel("Status: Waiting for Halloween Boss"),
+	BossLabel = Tabs.Boss:AddLabel("Halloween Boss: None"),
+	HealthLabel = Tabs.Boss:AddLabel("Health: 0 / 0"),
+	NextBossLabel = Tabs.Boss:AddLabel("Next Halloween Boss: Waiting for spawn"),
+	Data = {
+		Running = false,
+		Generation = 0,
+		Phase = "Waiting",
+		PunchInterval = 0.3,
+		LastPunch = 0,
+		AttackSequence = nil,
+		EvadeUntil = 0,
+		EvadeDistance = 230,
+		PunchBehindDistance = 45,
+		StompHealthThreshold = 0.35,
+		DodgeStomps = false,
+		Bosses = {
+			GrimReaper = "Grim Reaper",
+			FrankenBrute = "Frankenbrute",
+			PumpkinTitan = "Pumpkin Titan",
+			ScarecrowColossus = "Scarecrow Colossus"
+		},
+		BossOrder = {"GrimReaper", "FrankenBrute", "PumpkinTitan", "ScarecrowColossus"},
+		BossByDisplayName = {},
+		SelectedBosses = {},
+		Target = nil
+	}
 }
 
-for _, bossId in ipairs(Tabs.Boss.Halloween.BossOrder) do
-	Tabs.Boss.Halloween.Selected[bossId] = true
+Tabs.Boss.Halloween.getBossDisplayName = function(model)
+	return Tabs.Boss.Halloween.Data.Bosses[model:GetAttribute("BossId") or model.Name] or model.Name
 end
 
-Tabs.Boss.Halloween.StatusLabel = Tabs.Boss:AddLabel("Status: Waiting for Halloween Boss")
-Tabs.Boss.Halloween.BossLabel = Tabs.Boss:AddLabel("Halloween Boss: None")
-Tabs.Boss.Halloween.HealthLabel = Tabs.Boss:AddLabel("Health: 0 / 0")
-
-Tabs.Boss.Halloween.SelectedLabel = Tabs.Boss:AddLabel("Targeted: All")
-
-Tabs.Boss.Halloween.updateSelectedLabel = function()
-	local names = {}
-	for _, bossId in ipairs(Tabs.Boss.Halloween.BossOrder) do
-		if Tabs.Boss.Halloween.Selected[bossId] then
-			table.insert(names, Tabs.Boss.Halloween.Bosses[bossId])
-		end
-	end
-	Tabs.Boss.Halloween.SelectedLabel.Text = "Targeted: " .. (#names > 0 and table.concat(names, ", ") or "None")
-end
-
-Tabs.Boss.Halloween.Dropdown = Tabs.Boss:AddDropdown("Target Halloween Bosses", function(displayName)
-	for bossId, name in pairs(Tabs.Boss.Halloween.Bosses) do
-		if name == displayName then
-			Tabs.Boss.Halloween.Selected[bossId] = not Tabs.Boss.Halloween.Selected[bossId]
-			Tabs.Boss.Halloween.updateSelectedLabel()
-			return
-		end
-	end
-end)
-
-for _, bossId in ipairs(Tabs.Boss.Halloween.BossOrder) do
-	Tabs.Boss.Halloween.Dropdown:Add(Tabs.Boss.Halloween.Bosses[bossId])
-end
-
-Tabs.Boss.Halloween.getHealth = function(model)
+Tabs.Boss.Halloween.getBossHealth = function(health, model)
 	return tonumber(model:GetAttribute("Health")) or 0
 end
 
-Tabs.Boss.Halloween.getMaxHealth = function(model)
+Tabs.Boss.Halloween.getBossMaxHealth = function(maxHealth, model)
 	return tonumber(model:GetAttribute("MaxHealth")) or 0
 end
 
-Tabs.Boss.Halloween.getDisplayName = function(model)
-	return Tabs.Boss.Halloween.Bosses[model:GetAttribute("BossId") or model.Name] or model.Name
+Tabs.Boss.Halloween.SelectedBossesLabel = Tabs.Boss:AddLabel("Targeted Halloween Bosses: All")
+Tabs.Boss.Halloween.updateSelectedBossesLabel = function(selectedNames)
+	selectedNames = {}
+	for _, bossId in ipairs(Tabs.Boss.Halloween.Data.BossOrder) do
+		if Tabs.Boss.Halloween.Data.SelectedBosses[bossId] then
+			table.insert(selectedNames, Tabs.Boss.Halloween.Data.Bosses[bossId])
+		end
+	end
+	Tabs.Boss.Halloween.SelectedBossesLabel.Text = "Targeted Halloween Bosses: "
+		.. (#selectedNames > 0 and table.concat(selectedNames, ", ") or "None")
 end
 
-Tabs.Boss.Halloween.findBoss = function()
+Tabs.Boss.Halloween.BossDropdown = Tabs.Boss:AddDropdown("Target specific Halloween Bosses", function(displayName)
+	local bossId = Tabs.Boss.Halloween.Data.BossByDisplayName[displayName]
+	if not bossId then return end
+	Tabs.Boss.Halloween.Data.SelectedBosses[bossId] = not Tabs.Boss.Halloween.Data.SelectedBosses[bossId]
+	Tabs.Boss.Halloween.updateSelectedBossesLabel()
+end)
+for _, bossId in ipairs(Tabs.Boss.Halloween.Data.BossOrder) do
+	Tabs.Boss.Halloween.Data.BossByDisplayName[Tabs.Boss.Halloween.Data.Bosses[bossId]] = bossId
+	Tabs.Boss.Halloween.Data.SelectedBosses[bossId] = true
+	Tabs.Boss.Halloween.BossDropdown:Add(Tabs.Boss.Halloween.Data.Bosses[bossId])
+end
+Tabs.Boss.Halloween.updateSelectedBossesLabel()
+
+Tabs.Boss.Halloween.shouldFarmBoss = function(model)
+	return Tabs.Boss.Halloween.Data.SelectedBosses[model:GetAttribute("BossId") or model.Name] == true
+end
+
+Tabs.Boss.Halloween.findActiveBoss = function(selectedOnly)
 	local character = PlayerData.Player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local best, bestHitbox, bestDistance = nil, nil, math.huge
+	local bestModel, bestHitbox, closestDistance = nil, nil, math.huge
 
-	for _, candidate in ipairs(services.collectionservice:GetTagged("HalloweenBoss")) do
-		if candidate:IsA("Model") and candidate:IsDescendantOf(workspace) then
-			local bossId = candidate:GetAttribute("BossId") or candidate.Name
-			if Tabs.Boss.Halloween.Selected[bossId] and Tabs.Boss.Halloween.getHealth(candidate) > 0 then
-				local hitbox = candidate:FindFirstChild("BossDamageHitbox", true)
-					or candidate.PrimaryPart
-					or candidate:FindFirstChild("HumanoidRootPart")
-				if hitbox and hitbox:IsA("BasePart") then
-					local distance = root and (root.Position - hitbox.Position).Magnitude or 0
-					if distance < bestDistance then
-						best, bestHitbox, bestDistance = candidate, hitbox, distance
-					end
+	for _, candidate in ipairs(Services.CollectionService:GetTagged("HalloweenBoss")) do
+		if candidate:IsA("Model") and candidate:IsDescendantOf(workspace)
+			and Tabs.Boss.Halloween.getBossHealth(nil, candidate) > 0
+			and (not selectedOnly or Tabs.Boss.Halloween.shouldFarmBoss(candidate)) then
+			local candidateHitbox = candidate:FindFirstChild("BossDamageHitbox", true)
+				or candidate.PrimaryPart or candidate:FindFirstChild("HumanoidRootPart")
+			if candidateHitbox and candidateHitbox:IsA("BasePart") then
+				if selectedOnly and candidate == Tabs.Boss.Halloween.Data.Target then
+					return candidate, candidateHitbox
+				end
+				local distance = root and (root.Position - candidateHitbox.Position).Magnitude or 0
+				if not bestModel or distance < closestDistance then
+					bestModel, bestHitbox, closestDistance = candidate, candidateHitbox, distance
 				end
 			end
 		end
 	end
-
-	return best, bestHitbox
+	return bestModel, bestHitbox
 end
 
-Tabs.Boss.Halloween.pauseFarming = function()
-	Tabs.Boss.Halloween.PausedStrength = strengthTab.running
-	Tabs.Boss.Halloween.PausedRebirth = Tabs.FastFarming.running
-	if Tabs.Boss.Halloween.PausedStrength then
-		strengthTab.FastRepToggle:Set(false)
-	end
-	if Tabs.Boss.Halloween.PausedRebirth then
-		Tabs.FastFarming.FastRebirthToggle:Set(false)
-	end
-end
-
-Tabs.Boss.Halloween.resumeFarming = function()
-	if not Tabs.Boss.Halloween.ContinueFarming then return end
-	if Tabs.Boss.Halloween.PausedStrength and not strengthTab.running then
-		strengthTab.FastRepToggle:Set(true)
-	end
-	if Tabs.Boss.Halloween.PausedRebirth and not Tabs.FastFarming.running then
-		Tabs.FastFarming.FastRebirthToggle:Set(true)
-	end
-	Tabs.Boss.Halloween.PausedStrength = false
-	Tabs.Boss.Halloween.PausedRebirth = false
-end
-
-Tabs.Boss.Halloween.stopAll = function()
-	if Tabs.Boss.Halloween.MovementConnection then
-		Tabs.Boss.Halloween.MovementConnection:Disconnect()
-		Tabs.Boss.Halloween.MovementConnection = nil
-	end
-	Tabs.Boss.Halloween.PunchRunning = false
-	Tabs.Boss.Halloween.Target = nil
-end
-
-Tabs.Boss.Halloween.startMovement = function()
-	if Tabs.Boss.Halloween.MovementConnection then return end
-
-	Tabs.Boss.Halloween.MovementConnection = services.runservice.Heartbeat:Connect(function()
-		if not Tabs.Boss.Halloween.Running then
-			Tabs.Boss.Halloween.stopAll()
-			return
+task.spawn(function()
+	while true do
+		local model = Tabs.Boss.Halloween.Data.Target
+		if not model or not model.Parent or Tabs.Boss.Halloween.getBossHealth(nil, model) <= 0 then
+			model = Tabs.Boss.Halloween.findActiveBoss()
 		end
-
-		local target = Tabs.Boss.Halloween.Target
-		if not target or not target.Parent or Tabs.Boss.Halloween.getHealth(target) <= 0 then
-			return
+		if model then
+			Tabs.Boss.Halloween.BossLabel.Text = "Halloween Boss: " .. Tabs.Boss.Halloween.getBossDisplayName(model)
+			Tabs.Boss.Halloween.HealthLabel.Text = "Health: " .. formatNumber(Tabs.Boss.Halloween.getBossHealth(nil, model))
+				.. " / " .. formatNumber(Tabs.Boss.Halloween.getBossMaxHealth(nil, model))
+			Tabs.Boss.Halloween.NextBossLabel.Text = "Next Halloween Boss: Current boss active"
+		else
+			Tabs.Boss.Halloween.BossLabel.Text = "Halloween Boss: None"
+			Tabs.Boss.Halloween.HealthLabel.Text = "Health: 0 / 0"
+			Tabs.Boss.Halloween.NextBossLabel.Text = "Next Halloween Boss: Waiting for spawn"
 		end
+		task.wait(0.25)
+	end
+end)
 
-		local hitbox = target:FindFirstChild("BossDamageHitbox", true)
-			or target.PrimaryPart
-			or target:FindFirstChild("HumanoidRootPart")
-		if not hitbox then return end
-
-		local char = PlayerData.Player.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-		if not hrp or not humanoid or humanoid.Health <= 0 then return end
-
-		hrp.CFrame = hitbox.CFrame * CFrame.new(0, 2, 3.5)
-		hrp.AssemblyLinearVelocity = Vector3.zero
-		hrp.AssemblyAngularVelocity = Vector3.zero
-	end)
-end
-
-Tabs.Boss.Halloween.punch = function()
-	if not Tabs.Boss.Halloween.Running then return end
-
-	local target = Tabs.Boss.Halloween.Target
-	if not target or not target.Parent or Tabs.Boss.Halloween.getHealth(target) <= 0 then return end
-
+-- Halloween boss kesme fonksiyonu (Silence'taki punch mantığı)
+Tabs.Boss.Halloween.attack = function(target)
+	if not target or not target.Parent then return end
 	local char = PlayerData.Player.Character
 	if not char then return end
-
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return end
 
@@ -3200,164 +3161,82 @@ Tabs.Boss.Halloween.punch = function()
 	if not punch then return end
 
 	pcall(function()
-		if punch.Parent ~= char then
-			punch.Parent = char
+		if punch.Parent ~= char then punch.Parent = char end
+		if punch:FindFirstChild("attackTime") then punch.attackTime.Value = 0 end
+	end)
+
+	local hitbox = target:FindFirstChild("BossDamageHitbox", true)
+		or target.PrimaryPart or target:FindFirstChild("HumanoidRootPart")
+	if not hitbox or not hitbox:IsA("BasePart") then return end
+
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.CFrame = CFrame.lookAt(hitbox.Position + hitbox.CFrame.LookVector * 3, hitbox.Position)
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+
+	local leftHand = char:FindFirstChild("LeftHand")
+	local rightHand = char:FindFirstChild("RightHand")
+
+	pcall(function()
+		if leftHand then
+			firetouchinterest(hitbox, leftHand, 0)
+			firetouchinterest(hitbox, leftHand, 1)
 		end
-
-		if punch:FindFirstChild("attackTime") then
-			punch.attackTime.Value = 0
-		end
-
-		local hitbox = target:FindFirstChild("BossDamageHitbox", true)
-			or target.PrimaryPart
-			or target:FindFirstChild("HumanoidRootPart")
-		local rightHand = char:FindFirstChild("RightHand")
-		local leftHand = char:FindFirstChild("LeftHand")
-
-		if hitbox and firetouchinterest then
-			if rightHand then
-				firetouchinterest(hitbox, rightHand, 0)
-				firetouchinterest(hitbox, rightHand, 1)
-			end
-			if leftHand then
-				firetouchinterest(hitbox, leftHand, 0)
-				firetouchinterest(hitbox, leftHand, 1)
-			end
-		end
-
-		services.muscleEvent:FireServer("punch", "rightHand")
-		services.muscleEvent:FireServer("punch", "leftHand")
-		services.muscleEvent:FireServer("punch", "rightHand")
-		services.muscleEvent:FireServer("punch", "leftHand")
-
-		if punch.Activate then
-			punch:Activate()
+		if rightHand then
+			firetouchinterest(hitbox, rightHand, 0)
+			firetouchinterest(hitbox, rightHand, 1)
 		end
 	end)
-end
 
-Tabs.Boss.Halloween.startPunchLoop = function()
-	if Tabs.Boss.Halloween.PunchRunning then return end
-	Tabs.Boss.Halloween.PunchRunning = true
-
-	task.spawn(function()
-		while Tabs.Boss.Halloween.Running do
-			pcall(Tabs.Boss.Halloween.punch)
-			task.wait(Tabs.Boss.Halloween.PunchInterval)
-		end
-		Tabs.Boss.Halloween.PunchRunning = false
-	end)
-end
-
-Tabs.Boss.Halloween.wasFighting = false
-
-task.spawn(function()
-	while true do
-		local boss, hitbox = Tabs.Boss.Halloween.findBoss()
-
-		if boss then
-			if Tabs.Boss.Halloween.Running and not Tabs.Boss.Halloween.wasFighting then
-				Tabs.Boss.Halloween.wasFighting = true
-				Tabs.Boss.Halloween.pauseFarming()
-			end
-			Tabs.Boss.Halloween.Target = boss
-			Tabs.Boss.Halloween.BossLabel.Text = "Halloween Boss: " .. Tabs.Boss.Halloween.getDisplayName(boss)
-			Tabs.Boss.Halloween.HealthLabel.Text = "Health: "
-				.. formatNumber(Tabs.Boss.Halloween.getHealth(boss)) .. " / "
-				.. formatNumber(Tabs.Boss.Halloween.getMaxHealth(boss))
-		else
-			if Tabs.Boss.Halloween.Running and Tabs.Boss.Halloween.wasFighting then
-				Tabs.Boss.Halloween.wasFighting = false
-				Tabs.Boss.Halloween.resumeFarming()
-			end
-			Tabs.Boss.Halloween.Target = nil
-			Tabs.Boss.Halloween.BossLabel.Text = "Halloween Boss: None"
-			Tabs.Boss.Halloween.HealthLabel.Text = "Health: 0 / 0"
-		end
-
-		task.wait(0.25)
+	if os.clock() - Tabs.Boss.Halloween.Data.LastPunch >= Tabs.Boss.Halloween.Data.PunchInterval then
+		Tabs.Boss.Halloween.Data.LastPunch = os.clock()
+		pcall(function()
+			Services.muscleEvent:FireServer("punch", "leftHand")
+			Services.muscleEvent:FireServer("punch", "rightHand")
+			if punch.Activate then punch:Activate() end
+		end)
 	end
-end)
-
-Tabs.Boss.Halloween.ContinueSwitch = Tabs.Boss:AddSwitch("Continue Farming after Halloween Boss", function(state)
-	Tabs.Boss.Halloween.ContinueFarming = state
-	if state and not Tabs.Boss.Halloween.wasFighting then
-		Tabs.Boss.Halloween.resumeFarming()
-	end
-end)
-Tabs.Boss.Halloween.ContinueSwitch:Set(true)
+end
 
 Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Farm Halloween Boss", function(state)
 	if state and Boss.FarmActive and Tabs.Boss.AutoKillToggle then
 		Tabs.Boss.AutoKillToggle:Set(false)
 	end
-
-	Tabs.Boss.Halloween.Running = state
-	Tabs.Boss.Halloween.Generation = Tabs.Boss.Halloween.Generation + 1
-
+	Tabs.Boss.Halloween.Data.Running = state
+	Tabs.Boss.Halloween.Data.Generation += 1
 	if not state then
-		Tabs.Boss.Halloween.stopAll()
-		Tabs.Boss.Halloween.wasFighting = false
-		Tabs.Boss.Halloween.resumeFarming()
+		Tabs.Boss.Halloween.Data.Target = nil
+		Tabs.Boss.Halloween.Data.Phase = "Waiting"
 		Tabs.Boss.Halloween.StatusLabel.Text = "Status: Disabled"
 		return
 	end
 
-	Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Halloween Boss"
-	Tabs.Boss.Halloween.startMovement()
-	Tabs.Boss.Halloween.startPunchLoop()
-end)
-
-Tabs.Boss:AddSwitch("🎁 Auto Collect Chest", function(state)
-    Boss.AutoCollectChest = state
-    if not state then return end
-
-    task.spawn(function()
-        while Boss.AutoCollectChest do
-            pcall(function()
-                if not Boss.CurrentBoss then
-                    local chestFolder = Services.Workspace:FindFirstChild("BossChest")
-                    if chestFolder then
-                        local prompt = chestFolder:FindFirstChild("bossChestPrompt", true)
-                        local chestPart
-
-                        if prompt and prompt:IsA("ProximityPrompt") then
-                            if prompt.Parent and prompt.Parent:IsA("BasePart") then
-                                chestPart = prompt.Parent
-                            end
-                        end
-
-                        if not chestPart then
-                            local root = chestFolder:FindFirstChild("Root", true)
-                            if root and root:IsA("BasePart") then
-                                chestPart = root
-                            end
-                        end
-
-                        local char = PlayerData.Player.Character
-                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-                        if chestPart and hrp then
-                            hrp.CFrame = CFrame.new(
-                                chestPart.Position + chestPart.CFrame.RightVector * 3 + Vector3.new(0, 1, 0),
-                                chestPart.Position
-                            )
-                            task.wait(0.15)
-
-                            if Boss.AutoCollectChest and not Boss.CurrentBoss then
-                                Services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                                task.wait(0.5)
-                                Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                            end
-                        end
-                    end
-                end
-            end)
-            task.wait(0.2)
-        end
-
-        Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    end)
+	task.spawn(function(generation)
+		while Tabs.Boss.Halloween.Data.Running and Tabs.Boss.Halloween.Data.Generation == generation do
+			pcall(function()
+				local model, hitbox = Tabs.Boss.Halloween.findActiveBoss(true)
+				if model then
+					Tabs.Boss.Halloween.Data.Target = model
+					Tabs.Boss.Halloween.Data.Phase = "Fighting"
+					if PlayerData.Player.Character
+						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid")
+						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+						Tabs.Boss.Halloween.StatusLabel.Text = "Status: Fighting"
+						Tabs.Boss.Halloween.attack(model)
+					else
+						Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Respawn"
+					end
+				else
+					Tabs.Boss.Halloween.Data.Target = nil
+					Tabs.Boss.Halloween.Data.Phase = "Waiting"
+					Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Halloween Boss"
+				end
+			end)
+			task.wait(model and 0.03 or 0.25)
+		end
+	end, Tabs.Boss.Halloween.Data.Generation)
 end)
 
 Tabs.Pets:AddLabel("💰 Auto Buy")
