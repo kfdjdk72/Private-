@@ -3026,7 +3026,7 @@ Tabs.Boss.AutoKillToggle = Tabs.Boss:AddSwitch("💢 Auto Kill Boss", function(s
 end)
 
 Tabs.Boss:AddLabel("")
-Tabs.Boss:AddLabel("🎃 Halloween Boss Farming")
+Tabs.Boss:AddLabel("🎃 Halloween Boss Farming").TextSize = 19
 
 Tabs.Boss.Halloween = {
 	runtime = {},
@@ -3039,7 +3039,7 @@ Tabs.Boss.Halloween = {
 		Running = false,
 		Generation = 0,
 		Phase = "Waiting",
-		PunchInterval = 0.3,
+		PunchInterval = 0.05,
 		LastPunch = 0,
 		AttackSequence = nil,
 		EvadeUntil = 0,
@@ -3105,8 +3105,6 @@ Tabs.Boss.Halloween.findActiveBoss = function(selectedOnly)
 	local character = PlayerData.Player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local bestModel, bestHitbox, closestDistance = nil, nil, math.huge
-
-	-- CollectionService Syniox'ta tanımlı olmadığı için direkt game:GetService ile çekiyoruz
 	local CollectionService = game:GetService("CollectionService")
 
 	for _, candidate in ipairs(CollectionService:GetTagged("HalloweenBoss")) do
@@ -3149,32 +3147,95 @@ task.spawn(function()
 	end
 end)
 
--- Halloween boss kesme fonksiyonu
+Tabs.Boss.Halloween.getBossHeadPosition = function(model, hitbox)
+	local head = model:FindFirstChild("Head", true) or model:FindFirstChild("head", true)
+	if head and head:IsA("BasePart") then return head.Position end
+	if head and head:IsA("Bone") then return head.WorldPosition end
+	return hitbox.Position + Vector3.new(0, hitbox.Size.Y * 0.35, 0)
+end
+
+Tabs.Boss.Halloween.evadeAttack = function(boss, model, hitbox, root, humanoid)
+	local sequence = model:GetAttribute("BossAttackSequence")
+	local attackKind = model:GetAttribute("BossAttackKind")
+	local attackCFrame = model:GetAttribute("BossAttackCFrame")
+	local impactTime = model:GetAttribute("BossAttackImpactTime")
+
+	if typeof(sequence) == "number" and sequence ~= boss.Data.AttackSequence then
+		boss.Data.AttackSequence = sequence
+		if typeof(attackKind) == "string" and typeof(attackCFrame) == "CFrame" and typeof(impactTime) == "number" then
+			boss.Data.EvadeUntil = impactTime + 0.6
+		end
+	end
+
+	if typeof(attackCFrame) ~= "CFrame" or workspace:GetServerTimeNow() > boss.Data.EvadeUntil then
+		return
+	end
+
+	attackKind = string.lower(tostring(attackKind or ""))
+	
+	if string.find(attackKind, "punch", 1, true) then
+		local center = Tabs.Boss.Halloween.getBossHeadPosition(model, hitbox)
+		local direction = Vector3.new(attackCFrame.LookVector.X, 0, attackCFrame.LookVector.Z)
+		if direction.Magnitude < 1 then direction = Vector3.new(hitbox.CFrame.LookVector.X, 0, hitbox.CFrame.LookVector.Z) end
+		if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
+		local safePosition = center - direction.Unit * boss.Data.PunchBehindDistance
+		root.CFrame = CFrame.lookAt(safePosition, center)
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+		boss.StatusLabel.Text = "Status: Dodging Punch"
+		return "Punch"
+	end
+
+	if not string.find(attackKind, "stomp", 1, true) then return end
+	if humanoid.Health / math.max(humanoid.MaxHealth, 1) <= boss.Data.StompHealthThreshold then
+		boss.Data.DodgeStomps = true
+	end
+	if not boss.Data.DodgeStomps then return end
+
+	local direction = Vector3.new(root.Position.X - attackCFrame.Position.X, 0, root.Position.Z - attackCFrame.Position.Z)
+	if direction.Magnitude < 1 then
+		direction = Vector3.new(-attackCFrame.LookVector.X, 0, -attackCFrame.LookVector.Z)
+	end
+	if direction.Magnitude < 1 then direction = Vector3.new(1, 0, 0) end
+	direction = direction.Unit
+	local safePosition = attackCFrame.Position + direction * boss.Data.EvadeDistance + Vector3.new(0, 18, 0)
+	root.CFrame = CFrame.lookAt(safePosition, attackCFrame.Position)
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
+	boss.StatusLabel.Text = "Status: Dodging Stomp"
+	return "Stomp"
+end
+
 Tabs.Boss.Halloween.attack = function(target)
 	if not target or not target.Parent then return end
 	local char = PlayerData.Player.Character
 	if not char then return end
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return end
-
-	local punch = char:FindFirstChild("Punch") or PlayerData.Player.Backpack:FindFirstChild("Punch")
-	if not punch then return end
-
-	pcall(function()
-		if punch.Parent ~= char then punch.Parent = char end
-		if punch:FindFirstChild("attackTime") then punch.attackTime.Value = 0 end
-	end)
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
 
 	local hitbox = target:FindFirstChild("BossDamageHitbox", true)
 		or target.PrimaryPart or target:FindFirstChild("HumanoidRootPart")
 	if not hitbox or not hitbox:IsA("BasePart") then return end
 
-	local root = char:FindFirstChild("HumanoidRootPart")
-	if root then
-		root.CFrame = CFrame.lookAt(hitbox.Position + hitbox.CFrame.LookVector * 3, hitbox.Position)
-		root.AssemblyLinearVelocity = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
+	local evadeMode = Tabs.Boss.Halloween.evadeAttack(Tabs.Boss.Halloween, target, hitbox, root, humanoid)
+	if evadeMode == "Stomp" then return end 
+
+	local punch = char:FindFirstChild("Punch") or PlayerData.Player.Backpack:FindFirstChild("Punch")
+	if punch and punch.Parent ~= char then humanoid:EquipTool(punch) end
+	if punch then
+		pcall(function()
+			if punch:FindFirstChild("attackTime") then punch.attackTime.Value = 0 end
+		end)
 	end
+
+	if evadeMode ~= "Punch" then
+		local center = Tabs.Boss.Halloween.getBossHeadPosition(target, hitbox)
+		root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
+	end
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
 
 	local leftHand = char:FindFirstChild("LeftHand")
 	local rightHand = char:FindFirstChild("RightHand")
@@ -3195,17 +3256,20 @@ Tabs.Boss.Halloween.attack = function(target)
 		pcall(function()
 			Services.muscleEvent:FireServer("punch", "leftHand")
 			Services.muscleEvent:FireServer("punch", "rightHand")
-			if punch.Activate then punch:Activate() end
+			if punch and punch.Activate then 
+				punch:Activate() 
+			end
 		end)
 	end
 end
 
-Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Farm Halloween Boss", function(state)
+Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Halloween Boss", function(state)
 	if state and Boss.FarmActive and Tabs.Boss.AutoKillToggle then
 		Tabs.Boss.AutoKillToggle:Set(false)
 	end
 	Tabs.Boss.Halloween.Data.Running = state
 	Tabs.Boss.Halloween.Data.Generation += 1
+	
 	if not state then
 		Tabs.Boss.Halloween.Data.Target = nil
 		Tabs.Boss.Halloween.Data.Phase = "Waiting"
@@ -3220,10 +3284,15 @@ Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Farm Hallowe
 				if targetModel then
 					Tabs.Boss.Halloween.Data.Target = targetModel
 					Tabs.Boss.Halloween.Data.Phase = "Fighting"
+					
 					if PlayerData.Player.Character
 						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid")
 						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-						Tabs.Boss.Halloween.StatusLabel.Text = "Status: Fighting"
+						
+						if not string.find(Tabs.Boss.Halloween.StatusLabel.Text, "Dodging") then
+							Tabs.Boss.Halloween.StatusLabel.Text = "Status: Fighting"
+						end
+						
 						Tabs.Boss.Halloween.attack(targetModel)
 					else
 						Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Respawn"
@@ -3234,7 +3303,7 @@ Tabs.Boss.Halloween.AutoFarmSwitch = Tabs.Boss:AddSwitch("🎃 Auto Farm Hallowe
 					Tabs.Boss.Halloween.StatusLabel.Text = "Status: Waiting for Halloween Boss"
 				end
 			end)
-			task.wait(Tabs.Boss.Halloween.Data.Target and 0.03 or 0.25)
+			task.wait(Tabs.Boss.Halloween.Data.Target and 0.01 or 0.25)
 		end
 	end, Tabs.Boss.Halloween.Data.Generation)
 end)
