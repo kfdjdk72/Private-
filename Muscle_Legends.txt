@@ -3041,12 +3041,9 @@ Tabs.Boss.Alien = {
 		Phase = "Waiting",
 		PunchInterval = 0.01,
 		LastPunch = 0,
-		AttackSequence = nil,
 		EvadeUntil = 0,
-		EvadeDistance = 230,
-		PunchBehindDistance = 45,
-		StompHealthThreshold = 0.35,
-		DodgeStomps = false,
+		EvadeDistance = 150,
+		PunchBehindDistance = 35,
 		Target = nil
 	}
 }
@@ -3089,8 +3086,6 @@ Tabs.Boss.Alien.findActiveBoss = function()
 						end
 					end
 				end
-			elseif child:IsA("Folder") or child:IsA("Model") then
-            
 			end
 		end
 	end
@@ -3130,6 +3125,42 @@ Tabs.Boss.Alien.getBossHeadPosition = function(model, hitbox)
 	return hitbox.Position + Vector3.new(0, hitbox.Size.Y * 0.35, 0)
 end
 
+-- Saldırılardan kaçınma (Dodge) Mekanizması
+Tabs.Boss.Alien.evadeAttack = function(boss, model, hitbox, root)
+	local animator = model:FindFirstChildOfClass("Animator", true) or model:FindFirstChild("AnimationController")
+	if not animator then return end
+
+	-- Aktif oynatılan animasyonları kontrol et
+	for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+		local animName = string.lower(track.Name)
+		
+		-- Eğer M2Kick (Tekme/Ağır saldırı) çalınıyorsa geriye kaç
+		if string.find(animName, "m2kick", 1, true) or string.find(animName, "kick", 1, true) then
+			local center = hitbox.Position
+			local direction = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z).Unit
+			if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
+			local safePosition = center + direction * boss.Data.EvadeDistance + Vector3.new(0, 10, 0)
+			root.CFrame = CFrame.lookAt(safePosition, center)
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+			boss.StatusLabel.Text = "Status: Dodging Kick"
+			return "Kick"
+		
+		-- Eğer M1Attack çalınıyorsa arkasına geç
+		elseif string.find(animName, "m1attack", 1, true) then
+			local center = Tabs.Boss.Alien.getBossHeadPosition(model, hitbox)
+			local direction = Vector3.new(hitbox.CFrame.LookVector.X, 0, hitbox.CFrame.LookVector.Z)
+			if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
+			local safePosition = center - direction.Unit * boss.Data.PunchBehindDistance
+			root.CFrame = CFrame.lookAt(safePosition, center)
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+			boss.StatusLabel.Text = "Status: Dodging M1"
+			return "M1"
+		end
+	end
+end
+
 Tabs.Boss.Alien.attack = function(target)
 	if not target or not target.Parent then return end
 	local char = PlayerData.Player.Character
@@ -3143,11 +3174,17 @@ Tabs.Boss.Alien.attack = function(target)
 		or target.PrimaryPart or target:FindFirstChild("HumanoidRootPart")
 	if not hitbox or not hitbox:IsA("BasePart") then return end
 
+	-- Kaçınma kontrolü
+	local evadeMode = Tabs.Boss.Alien.evadeAttack(Tabs.Boss.Alien, target, hitbox, root)
+	if evadeMode == "Kick" then return end
+
 	local punch = char:FindFirstChild("Punch") or PlayerData.Player.Backpack:FindFirstChild("Punch")
 	if punch and punch.Parent ~= char then humanoid:EquipTool(punch) end
 	
-	local center = Tabs.Boss.Alien.getBossHeadPosition(target, hitbox)
-	root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
+	if evadeMode ~= "M1" then
+		local center = Tabs.Boss.Alien.getBossHeadPosition(target, hitbox)
+		root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
+	end
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
 
@@ -3206,7 +3243,10 @@ Tabs.Boss.Alien.AutoFarmSwitch = Tabs.Boss:AddSwitch("👽 Auto Kill Alien Boss"
 						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid")
 						and PlayerData.Player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
 						
-						Tabs.Boss.Alien.StatusLabel.Text = "Status: Fighting Alien Boss"
+						if not string.find(Tabs.Boss.Alien.StatusLabel.Text, "Dodging") then
+							Tabs.Boss.Alien.StatusLabel.Text = "Status: Fighting Alien Boss"
+						end
+						
 						Tabs.Boss.Alien.attack(targetModel)
 					else
 						Tabs.Boss.Alien.StatusLabel.Text = "Status: Waiting for Respawn"
