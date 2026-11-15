@@ -3078,6 +3078,7 @@ Tabs.Boss:AddSwitch("🎁 Auto Collect Chest", function(state)
 end)
 
 Tabs.Boss:AddLabel("Syniox On Top")
+Tabs.Boss:AddLabel("")
 Tabs.Boss:AddLabel("👽 Alien Boss Farming").TextSize = 19
 
 Tabs.Boss.Alien = {
@@ -3184,16 +3185,16 @@ Tabs.Boss.Alien.evadeAttack = function(boss, model, hitbox, root)
 
 	local sequence = model:GetAttribute("BossAttackSequence")
 	local attackKind = model:GetAttribute("BossAttackKind")
-	local impactTime = model:GetAttribute("BossAttackImpactTime")
 
 	if typeof(sequence) == "number" and sequence ~= boss.Data.AttackSequence then
 		boss.Data.AttackSequence = sequence
 		if typeof(attackKind) == "string" then
 			local kindLower = string.lower(attackKind)
-			boss.Data.EvadeUntil = now + 0.85
 			if string.find(kindLower, "kick", 1, true) or string.find(kindLower, "stomp", 1, true) or string.find(kindLower, "m2", 1, true) then
+				boss.Data.EvadeUntil = now + 3.0
 				boss.Data.EvadeType = "Kick"
 			else
+				boss.Data.EvadeUntil = now + 2.0 -- M1 / Yumruk için bekleme süresi 2 saniye yapıldı
 				boss.Data.EvadeType = "M1"
 			end
 		end
@@ -3212,11 +3213,11 @@ Tabs.Boss.Alien.evadeAttack = function(boss, model, hitbox, root)
 				local trackId = track.Animation and track.Animation.AnimationId or ""
 				local trackName = string.lower(track.Name)
 				if (m2Id ~= "" and trackId == m2Id) or string.find(trackName, "m2", 1, true) or string.find(trackName, "kick", 1, true) then
-					boss.Data.EvadeUntil = now + 0.5
+					boss.Data.EvadeUntil = now + 3.0
 					boss.Data.EvadeType = "Kick"
 					break
 				elseif (m1Id ~= "" and trackId == m1Id) or string.find(trackName, "m1", 1, true) then
-					boss.Data.EvadeUntil = now + 0.35
+					boss.Data.EvadeUntil = now + 2.0 -- Animasyon algılandığında M1 için 2 saniye arkada kalır
 					boss.Data.EvadeType = "M1"
 					break
 				end
