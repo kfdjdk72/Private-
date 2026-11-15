@@ -1,0 +1,3126 @@
+---------------------------------------------------------------
+-- Syniox Hub Loader  |  v2.0  |  Modern UI
+-- Left info panel removed; profile card + game card added
+-- Emoji replaced with Lucide icons served from Roblox asset IDs
+---------------------------------------------------------------
+
+local TweenService       = game:GetService("TweenService")
+local Players            = game:GetService("Players")
+local HttpService        = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local ContentProvider    = game:GetService("ContentProvider")
+
+local Player    = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+local CORRECT_KEY  = "Syniox-Yusuf"
+local DISCORD_LINK = "https://syniox-key-site.vercel.app/"
+local KEY_LINK     = "https://syniox-key-site.vercel.app/"
+local VERSION      = "v2.0"
+
+local KEY_FILE      = "SynioxHub_Key.txt"
+local KEY_FOLDER    = "SynioxHub"
+local KEY_VALID_DAYS = 7
+
+-- Remote thumbnails: high quality images served from https://tr.rbxcdn.com by
+-- the Roblox thumbnails API. Some executor/client setups never render external
+-- https urls inside an ImageLabel, which blanks the artwork. The local
+-- rbxthumb:// source always works, so remote swap is OFF by default.
+-- Flip to true only if images from rbxcdn load in your environment.
+local USE_REMOTE_THUMBNAILS = false
+
+local KEY_W, KEY_H = 860, 460
+local LDR_W, LDR_H = 1000, 580
+
+local C = {
+	bg       = Color3.fromRGB(10, 1, 3),
+	card     = Color3.fromRGB(27, 3, 9),
+	bar      = Color3.fromRGB(18, 2, 6),
+	accent   = Color3.fromRGB(255, 58, 96),
+	accent2  = Color3.fromRGB(150, 5, 25),
+	text     = Color3.fromRGB(255, 255, 255),
+	sub      = Color3.fromRGB(222, 196, 203),
+	dim      = Color3.fromRGB(178, 152, 160),
+	green    = Color3.fromRGB(60, 255, 140),
+	greenDim = Color3.fromRGB(24, 130, 78),
+	amber    = Color3.fromRGB(255, 176, 60),
+	red      = Color3.fromRGB(255, 78, 104),
+	chip     = Color3.fromRGB(238, 238, 244),
+	icon     = Color3.fromRGB(18, 18, 22),
+}
+
+local THEMES = {
+	Crimson = {
+		bg = Color3.fromRGB(10, 1, 3), card = Color3.fromRGB(27, 3, 9), bar = Color3.fromRGB(18, 2, 6),
+		accent = Color3.fromRGB(255, 58, 96), accent2 = Color3.fromRGB(150, 5, 25),
+		text = Color3.fromRGB(255, 255, 255), sub = Color3.fromRGB(222, 196, 203), dim = Color3.fromRGB(178, 152, 160),
+		glow = Color3.fromRGB(255, 10, 45), particle = Color3.fromRGB(255, 70, 100),
+	},
+	NewYear = {
+		bg = Color3.fromRGB(5, 8, 20), card = Color3.fromRGB(12, 19, 42), bar = Color3.fromRGB(8, 13, 30),
+		accent = Color3.fromRGB(255, 205, 76), accent2 = Color3.fromRGB(72, 126, 255),
+		text = Color3.fromRGB(255, 255, 255), sub = Color3.fromRGB(205, 216, 242), dim = Color3.fromRGB(137, 157, 198),
+		glow = Color3.fromRGB(70, 120, 255), particle = Color3.fromRGB(255, 214, 100),
+	},
+	Aurora = {
+		bg = Color3.fromRGB(3, 12, 19), card = Color3.fromRGB(5, 29, 36), bar = Color3.fromRGB(3, 20, 28),
+		accent = Color3.fromRGB(63, 245, 190), accent2 = Color3.fromRGB(52, 120, 255),
+		text = Color3.fromRGB(242, 255, 253), sub = Color3.fromRGB(183, 225, 220), dim = Color3.fromRGB(119, 174, 171),
+		glow = Color3.fromRGB(40, 220, 185), particle = Color3.fromRGB(95, 255, 215),
+	},
+	Neon = {
+		bg = Color3.fromRGB(8, 3, 18), card = Color3.fromRGB(27, 7, 48), bar = Color3.fromRGB(17, 4, 33),
+		accent = Color3.fromRGB(238, 75, 255), accent2 = Color3.fromRGB(75, 126, 255),
+		text = Color3.fromRGB(255, 250, 255), sub = Color3.fromRGB(220, 190, 235), dim = Color3.fromRGB(165, 133, 190),
+		glow = Color3.fromRGB(180, 40, 255), particle = Color3.fromRGB(245, 95, 255),
+	},
+	Ocean = {
+		bg = Color3.fromRGB(2, 8, 16), card = Color3.fromRGB(5, 24, 42), bar = Color3.fromRGB(3, 15, 29),
+		accent = Color3.fromRGB(61, 179, 255), accent2 = Color3.fromRGB(45, 91, 220),
+		text = Color3.fromRGB(242, 250, 255), sub = Color3.fromRGB(182, 213, 236), dim = Color3.fromRGB(116, 157, 188),
+		glow = Color3.fromRGB(26, 130, 255), particle = Color3.fromRGB(87, 196, 255),
+	},
+}
+
+local function seasonalTheme()
+	local month = tonumber(os.date("%m")) or 0
+	local day = tonumber(os.date("%d")) or 0
+	if month == 12 or month == 1 or (month == 2 and day <= 15) then return "NewYear" end
+	local names = {"Crimson", "Aurora", "Neon", "Ocean"}
+	return names[(tonumber(os.date("%j")) or 1) % #names + 1]
+end
+
+local ACTIVE_THEME = seasonalTheme()
+local THEME_ORDER = {"Crimson", "NewYear", "Aurora", "Neon", "Ocean"}
+for key, value in pairs(THEMES[ACTIVE_THEME]) do C[key] = value end
+
+local function applyTheme(name, roots)
+	local theme = THEMES[name]
+	if not theme then return end
+	local previous = {}
+	for key, value in pairs(C) do previous[key] = value end
+	for key, value in pairs(theme) do C[key] = value end
+	ACTIVE_THEME = name
+
+	for _, root in ipairs(roots or {}) do
+		if root and root.Parent then
+			for _, obj in ipairs(root:GetDescendants()) do
+				if obj:IsA("Frame") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+					if obj.BackgroundColor3 == previous.bg then obj.BackgroundColor3 = C.bg
+					elseif obj.BackgroundColor3 == previous.card then obj.BackgroundColor3 = C.card
+					elseif obj.BackgroundColor3 == previous.bar then obj.BackgroundColor3 = C.bar
+					elseif obj.BackgroundColor3 == previous.accent then obj.BackgroundColor3 = C.accent end
+				elseif obj:IsA("TextLabel") then
+					if obj.TextColor3 == previous.accent then obj.TextColor3 = C.accent
+					elseif obj.TextColor3 == previous.dim then obj.TextColor3 = C.dim
+					elseif obj.TextColor3 == previous.sub then obj.TextColor3 = C.sub end
+				elseif obj:IsA("UIStroke") then
+					if obj.Color == previous.accent or obj.Color == previous.accent2 then obj.Color = C.accent end
+				elseif obj:IsA("UIGradient") then
+					obj.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, C.accent),
+						ColorSequenceKeypoint.new(1, C.bg),
+					})
+				end
+			end
+		end
+	end
+end
+
+local function nextTheme()
+	local index = table.find(THEME_ORDER, ACTIVE_THEME) or 1
+	return THEME_ORDER[index % #THEME_ORDER + 1]
+end
+
+local ICON = {
+	copy        = "rbxassetid://10709812159",
+	clipboard   = "rbxassetid://10709798574",
+	eye         = "rbxassetid://10723346959",
+	eyeOff      = "rbxassetid://10723346871",
+	key         = "rbxassetid://10723416652",
+	lock        = "rbxassetid://10723434711",
+	unlock      = "rbxassetid://10747366027",
+	search      = "rbxassetid://10734943674",
+	play        = "rbxassetid://10734923549",
+	playCircle  = "rbxassetid://10734923214",
+	rocket      = "rbxassetid://10734934585",
+	check       = "rbxassetid://10709790644",
+	checkCircle = "rbxassetid://10709790387",
+	x           = "rbxassetid://10747384394",
+	alert       = "rbxassetid://10709753149",
+	info        = "rbxassetid://10723415903",
+	user        = "rbxassetid://10747373176",
+	users       = "rbxassetid://10747373426",
+	hash        = "rbxassetid://10723405975",
+	atSign      = "rbxassetid://10709769286",
+	external    = "rbxassetid://10723346684",
+	message     = "rbxassetid://10734888000",
+	gamepad     = "rbxassetid://10723395215",
+	star        = "rbxassetid://10734966248",
+	shield      = "rbxassetid://10734951367",
+	clock       = "rbxassetid://10709805144",
+	server      = "rbxassetid://10734949856",
+	globe       = "rbxassetid://10723404337",
+	trash       = "rbxassetid://10747362241",
+	crown       = "rbxassetid://107097818626",
+	calendar    = "rbxassetid://10709789505",
+	palette     = "rbxassetid://10734966248",
+	flame       = "rbxassetid://10723376114",
+	monitor     = "rbxassetid://10734896881",
+	terminal    = "rbxassetid://10734982144",
+	arrowRight  = "rbxassetid://10709768347",
+	fingerprint = "rbxassetid://10723375250",
+	minus       = "rbxassetid://10734896206",
+	minusCircle = "rbxassetid://10734895856",
+	bell        = "rbxassetid://10709775704",
+	alertCircle = "rbxassetid://10709752996",
+	eraser      = "rbxassetid://10723346158",
+}
+
+local TONE = {
+	neutral = {plate = Color3.fromRGB(36, 38, 48),  glyph = Color3.fromRGB(240, 240, 248)},
+	red     = {plate = Color3.fromRGB(78, 8, 24),   glyph = Color3.fromRGB(255, 138, 158)},
+	amber   = {plate = Color3.fromRGB(74, 44, 4),   glyph = Color3.fromRGB(255, 205, 116)},
+	green   = {plate = Color3.fromRGB(6, 54, 32),   glyph = Color3.fromRGB(126, 255, 196)},
+	blue    = {plate = Color3.fromRGB(14, 28, 78),  glyph = Color3.fromRGB(146, 180, 255)},
+}
+
+local function safeSetClipboard(text)
+	local ok = pcall(setclipboard, text)
+	if not ok then pcall(function() clipboard.set(text) end) end
+end
+
+local function readClipboard()
+	local ok, v = pcall(function() return getclipboard() end)
+	if ok and type(v) == "string" then return v end
+	ok, v = pcall(function() return readclipboard() end)
+	if ok and type(v) == "string" then return v end
+	ok, v = pcall(function() return clipboard.get() end)
+	if ok and type(v) == "string" then return v end
+	return nil
+end
+
+local function httpGet(url)
+	local attempts = {
+		function() return game:HttpGet(url, true) end,
+		function() return game:HttpGet(url) end,
+		function() return HttpGet(url) end,
+		function()
+			local r = request({Url = url, Method = "GET"})
+			if type(r) == "table" then return r.Body end
+		end,
+		function()
+			local r = http_request({Url = url, Method = "GET"})
+			if type(r) == "table" then return r.Body end
+		end,
+		function()
+			local r = syn.request({Url = url, Method = "GET"})
+			if type(r) == "table" then return r.Body end
+		end,
+	}
+	for _, fn in ipairs(attempts) do
+		local ok, res = pcall(fn)
+		if ok and type(res) == "string" and res ~= "" then return res end
+	end
+	return nil
+end
+
+local function decodeJSON(str)
+	local ok, data = pcall(function() return HttpService:JSONDecode(str) end)
+	if ok and type(data) == "table" then return data end
+	return nil
+end
+
+local function rbxThumb(kind, id, w, h)
+	return "rbxthumb://type=" .. kind .. "&id=" .. tostring(id) .. "&w=" .. w .. "&h=" .. h
+end
+
+local function safeGameNumber(getter)
+	local ok, v = pcall(getter)
+	if ok and type(v) == "number" and v > 0 then return v end
+	return nil
+end
+
+
+local function normalizeKey(raw)
+	local t = tostring(raw or "")
+	t = t:match("^%s*(.-)%s*$") or t
+	t = t:gsub("^[%s'\"`%[%]]+", ""):gsub("[%s'\"`%[%]]+$", "")
+	return t
+end
+
+local function isValidKey(k)
+	return k ~= "" and string.lower(k) == string.lower(CORRECT_KEY)
+end
+
+local function keyFileApiOk()
+	return type(isfile) == "function"
+		and type(readfile) == "function"
+		and type(writefile) == "function"
+end
+
+local function nowTime()
+	local ok, t = pcall(function() return os.time() end)
+	if ok and type(t) == "number" and t > 0 then return t end
+	local ok2, t2 = pcall(function() return workspace:GetServerTimeNow() end)
+	if ok2 and type(t2) == "number" and t2 > 0 then return math.floor(t2) end
+	return 0
+end
+
+local KEY_PATHS = {KEY_FILE, KEY_FOLDER .. "/" .. KEY_FILE}
+
+local function saveKeyToFile(key)
+	if not keyFileApiOk() then return false end
+	local payload = tostring(nowTime()) .. "\n" .. normalizeKey(key)
+	for _, path in ipairs(KEY_PATHS) do
+		if path ~= KEY_FILE then pcall(function() makefolder(KEY_FOLDER) end) end
+		local ok = pcall(function() writefile(path, payload) end)
+		if ok then return true end
+	end
+	return false
+end
+
+local function loadSavedKey()
+	if not keyFileApiOk() then return nil end
+	local ok, raw = pcall(function()
+		for _, path in ipairs(KEY_PATHS) do
+			if isfile(path) then
+				local content = readfile(path)
+				if type(content) == "string" and content ~= "" then return content end
+			end
+		end
+		return nil
+	end)
+	if not ok or type(raw) ~= "string" or raw == "" then return nil end
+
+	local ts, key = raw:match("^(%d+)%s*\n(.+)$")
+	if not key then
+		key, ts = raw, 0
+	end
+	key = normalizeKey(key)
+	if not isValidKey(key) then return nil end
+
+	local savedAt = tonumber(ts) or 0
+	local now = nowTime()
+	local age = now - savedAt
+	if age < 0 then age = 0 end
+	if savedAt > 0 and age > KEY_VALID_DAYS * 86400 then return nil end
+	if savedAt == 0 then saveKeyToFile(key) end
+	return key
+end
+
+local function fetchNameViaApi(placeId)
+	local uniStr = httpGet("https://apis.roblox.com/universes/v1/places/" .. tostring(placeId) .. "/universe")
+	local uni = decodeJSON(uniStr)
+	local uid = type(uni) == "table" and uni.universeId
+	if not uid then return nil end
+	local gStr = httpGet("https://games.roblox.com/v1/games?universeIds=" .. tostring(uid))
+	local g = decodeJSON(gStr)
+	if type(g) == "table" and type(g.data) == "table" and type(g.data[1]) == "table" then
+		local n = g.data[1].Name
+		if type(n) == "string" and n ~= "" then return n end
+	end
+	return nil
+end
+
+local function productInfoName(info)
+	if type(info) == "table" and type(info.Name) == "string" and info.Name ~= "" then
+		return info.Name
+	end
+	return nil
+end
+
+local function fetchNameViaMarket(placeId)
+	local ok, info = pcall(function()
+		return MarketplaceService:GetProductInfo(placeId, Enum.AssetDependencyType.Place)
+	end)
+	local n = ok and productInfoName(info)
+	if n then return n end
+	ok, info = pcall(function() return MarketplaceService:GetProductInfo(placeId) end)
+	return ok and productInfoName(info) or nil
+end
+
+local function fetchRealName(placeId)
+	local n = fetchNameViaMarket(placeId)
+	if n then return n end
+	local okApi, name = pcall(fetchNameViaApi, placeId)
+	if okApi and name then return name end
+	return nil
+end
+
+local function getPlaceName(placeId)
+	local n = fetchRealName(placeId)
+	if n then return n end
+	if type(game.Name) == "string" and game.Name ~= "" then
+		return game.Name
+	end
+	return "Unknown game"
+end
+
+local function getExecutorName()
+	local ok, name = pcall(function() return identifyexecutor() end)
+	if not ok or type(name) ~= "string" or name == "" then
+		ok, name = pcall(function() return getexecutorname() end)
+	end
+	if ok and type(name) == "string" and name ~= "" then return name end
+	return "Unknown"
+end
+
+local function maskValue(value)
+	local s = tostring(value)
+	return string.rep("*", math.min(math.max(#s, 6), 12))
+end
+
+local cachedMaxPlayers = nil
+local maxPlayersRow = nil
+
+local function maxPlayersText()
+	if cachedMaxPlayers then return tostring(cachedMaxPlayers) end
+	local probes = {
+		function() return game.MaxPlayers end,
+		function() return game.Players.MaxPlayers end,
+		function() return game:GetAttribute("MaxPlayers") end,
+	}
+	for _, probe in ipairs(probes) do
+		local ok, v = pcall(probe)
+		if ok and type(v) == "number" and v > 0 then
+			cachedMaxPlayers = v
+			return tostring(v)
+		end
+	end
+	return "Loading..."
+end
+
+local function applyMaxPlayers()
+	if not cachedMaxPlayers or not maxPlayersRow then return end
+	maxPlayersRow.value = tostring(cachedMaxPlayers)
+	local lbl = maxPlayersRow.labelRef
+	if lbl and lbl.Parent then lbl.Text = maxPlayersRow.value end
+end
+
+local function New(class, props)
+	local inst = Instance.new(class)
+	for k, v in pairs(props) do
+		inst[k] = v
+	end
+	return inst
+end
+
+local function corner(inst, radius)
+	return New("UICorner", {CornerRadius = UDim.new(0, radius), Parent = inst})
+end
+
+local function uiStroke(inst, color, thickness, transparency)
+	return New("UIStroke", {
+		Color = color,
+		Thickness = thickness,
+		Transparency = transparency or 0,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Parent = inst,
+	})
+end
+
+local function uiGradient(inst, keypoints, rotation, transparencySeq)
+	local g = New("UIGradient", {
+		Color = ColorSequence.new(keypoints),
+		Rotation = rotation or 0,
+		Parent = inst,
+	})
+	if transparencySeq then g.Transparency = transparencySeq end
+	return g
+end
+
+local function label(parent, props)
+	local base = {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Font = Enum.Font.GothamSemibold,
+		Text = "",
+		TextColor3 = C.text,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Center,
+	}
+	for k, v in pairs(props) do base[k] = v end
+	base.Parent = parent
+	return New("TextLabel", base)
+end
+
+local touchMode = false
+pcall(function()
+	touchMode = game:GetService("UserInputService").TouchEnabled == true
+end)
+
+local chipState = {}
+
+local function applyChipColors(chip, instant)
+	local s = chipState[chip]
+	if not s or not chip.Parent then return end
+	local bg, tr
+	if s.hovered and s.hover then
+		bg, tr = s.hover, s.hoverTrans
+	else
+		bg, tr = s.base, s.baseTrans
+	end
+	if instant then
+		chip.BackgroundColor3 = bg
+		chip.BackgroundTransparency = tr
+	else
+		TweenService:Create(chip, TweenInfo.new(0.14), {
+			BackgroundColor3 = bg, BackgroundTransparency = tr,
+		}):Play()
+	end
+end
+
+local function iconChip(parent, x, y, size, iconId, opts)
+	opts = opts or {}
+	local z = opts.z or 16
+	local isButton = opts.button == true
+	local tone = opts.tone and TONE[opts.tone]
+	local baseBg = opts.bg or (tone and tone.plate) or C.chip
+	local baseTrans = opts.bgTrans or 0.05
+	local props = {
+		Position = UDim2.new(0, x, 0, y),
+		Size = UDim2.new(0, size, 0, size),
+		BackgroundColor3 = baseBg,
+		BackgroundTransparency = baseTrans,
+		BorderSizePixel = 0,
+		ZIndex = z,
+		Parent = parent,
+	}
+	if isButton then
+		props.Text = ""
+		props.AutoButtonColor = false
+	end
+	local chip = New(isButton and "TextButton" or "Frame", props)
+	chipState[chip] = {base = baseBg, baseTrans = baseTrans}
+	corner(chip, opts.radius or math.max(6, math.floor(size * 0.3)))
+	if opts.stroke ~= false then
+		uiStroke(chip, opts.strokeColor or Color3.fromRGB(255, 255, 255), 1, opts.strokeTrans or 0.8)
+	end
+	local iconSize = math.max(10, math.floor(size * (opts.iconScale or 0.58)))
+	local img = New("ImageLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(0, iconSize, 0, iconSize),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Image = iconId or "",
+		ImageColor3 = opts.tint or (tone and tone.glyph) or C.icon,
+		ScaleType = Enum.ScaleType.Fit,
+		ZIndex = z + 1,
+		Parent = chip,
+	})
+	return chip, img
+end
+
+local function iconButton(parent, x, y, size, iconId, onClick, opts)
+	opts = opts or {}
+	local chip, img = iconChip(parent, x, y, size, iconId, {
+		button = true, z = opts.z, radius = opts.radius,
+		bg = opts.bg, bgTrans = opts.bgTrans, iconScale = opts.iconScale,
+		strokeColor = opts.strokeColor, strokeTrans = opts.strokeTrans,
+		tint = opts.tint, tone = opts.tone,
+	})
+	local s = chipState[chip]
+	if s then
+		s.hover = opts.hoverBg or s.base:Lerp(Color3.new(1, 1, 1), 0.32)
+		s.hoverTrans = opts.hoverTrans or math.max(0, s.baseTrans * 0.4)
+	end
+	chip.MouseEnter:Connect(function()
+		if s then s.hovered = true end
+		applyChipColors(chip)
+	end)
+	chip.MouseLeave:Connect(function()
+		if s then s.hovered = false end
+		applyChipColors(chip)
+		TweenService:Create(chip, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Size = UDim2.new(0, size, 0, size)
+		}):Play()
+	end)
+	chip.MouseButton1Down:Connect(function()
+		TweenService:Create(chip, TweenInfo.new(0.05), {
+			Size = UDim2.new(0, size - 3, 0, size - 3),
+		}):Play()
+	end)
+	chip.MouseButton1Up:Connect(function()
+		TweenService:Create(chip, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Size = UDim2.new(0, size, 0, size),
+		}):Play()
+		if touchMode and s then
+			task.delay(0.14, function()
+				if chip.Parent and s.hovered then
+					s.hovered = false
+					applyChipColors(chip)
+				end
+			end)
+		end
+	end)
+	if onClick then
+		chip.MouseButton1Click:Connect(function()
+			onClick(chip, img)
+		end)
+	end
+	return chip, img
+end
+
+local function flashCopied(img, chip)
+	if not img then return end
+	local prevIcon = img.Image
+	local prevBg = chip and chipState[chip] == nil and chip.BackgroundColor3 or nil
+	img.Image = ICON.check
+	if chip then
+		chip.BackgroundColor3 = Color3.fromRGB(150, 255, 195)
+	end
+	task.delay(1.2, function()
+		if img.Parent then img.Image = prevIcon end
+		if chip and chip.Parent then
+			if chipState[chip] then
+				applyChipColors(chip)
+			elseif prevBg then
+				chip.BackgroundColor3 = prevBg
+			end
+		end
+	end)
+end
+
+local liveToasts = {}
+
+local TOAST_STYLE = {
+	success = {bg = Color3.fromRGB(14, 74, 46), stroke = C.green,  icon = ICON.check,       iconBg = Color3.fromRGB(10, 62, 38),  glyph = Color3.fromRGB(150, 255, 205)},
+	error   = {bg = Color3.fromRGB(104, 16, 34), stroke = C.red,   icon = ICON.alertCircle, iconBg = Color3.fromRGB(86, 12, 28),   glyph = Color3.fromRGB(255, 170, 185)},
+	info    = {bg = Color3.fromRGB(30, 40, 78),  stroke = Color3.fromRGB(120, 160, 255), icon = ICON.bell, iconBg = Color3.fromRGB(24, 34, 66), glyph = Color3.fromRGB(170, 198, 255)},
+}
+
+local function showToast(parent, text, kind)
+	if not parent or not parent.Parent then return end
+	local st = TOAST_STYLE[kind or "success"] or TOAST_STYLE.success
+
+	local toast = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, 26),
+		Size = UDim2.new(0, 300, 0, 44),
+		BackgroundColor3 = st.bg,
+		BackgroundTransparency = 0.05,
+		BorderSizePixel = 0,
+		ZIndex = 56,
+		Parent = parent,
+	})
+	corner(toast, 22)
+	uiStroke(toast, st.stroke, 1.5, 0.35)
+	uiGradient(toast, {
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(0.75, 0.75, 0.75)),
+	}, 90)
+
+	iconChip(toast, 8, 8, 28, st.icon, {z = 58, radius = 14, bg = st.iconBg, bgTrans = 0.06, tint = st.glyph})
+	local txt = label(toast, {
+		Position = UDim2.new(0, 46, 0, 0),
+		Size = UDim2.new(1, -56, 1, 0),
+		Text = text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 58,
+	})
+
+	TweenService:Create(toast, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, 0, 1, -14),
+		Size = UDim2.new(0, 330, 0, 44),
+	}):Play()
+
+	for _, other in ipairs(liveToasts) do
+		if other.Parent then
+			local p = other.Position
+			TweenService:Create(other, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset - 52),
+			}):Play()
+		end
+	end
+	table.insert(liveToasts, toast)
+
+	task.delay(2.4, function()
+		if not toast.Parent then return end
+		local out = TweenService:Create(toast, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+			Position = UDim2.new(0.5, 0, 1, 26),
+			Size = UDim2.new(0, 306, 0, 44),
+			BackgroundTransparency = 1,
+		})
+		out:Play()
+		for _, d in ipairs(toast:GetDescendants()) do
+			if d:IsA("TextLabel") then
+				TweenService:Create(d, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {TextTransparency = 1}):Play()
+			elseif d:IsA("ImageLabel") then
+				TweenService:Create(d, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {ImageTransparency = 1}):Play()
+			elseif d:IsA("UIStroke") then
+				TweenService:Create(d, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Transparency = 1}):Play()
+			end
+		end
+		out.Completed:Wait()
+		local idx = table.find(liveToasts, toast)
+		if idx then table.remove(liveToasts, idx) end
+		toast:Destroy()
+	end)
+
+	return toast
+end
+
+local function linkButton(btn, link, parent)
+	btn.MouseButton1Click:Connect(function()
+		safeSetClipboard(link)
+		local img = btn:FindFirstChildWhichIsA("ImageLabel", true)
+		if img then flashCopied(img, img.Parent) end
+		showToast(parent, "Link copied  —  " .. link, "success")
+	end)
+end
+
+local function makeButton(parent, opts)
+	local z = opts.z or 22
+	local primary = opts.kind ~= "ghost"
+	local btn = New("TextButton", {
+		Position = UDim2.new(0, opts.x, 0, opts.y),
+		Size = UDim2.new(0, opts.w, 0, opts.h),
+		BackgroundColor3 = primary and Color3.fromRGB(215, 20, 45) or Color3.fromRGB(38, 5, 12),
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		ZIndex = z,
+		Parent = parent,
+	})
+	corner(btn, opts.radius or 12)
+	local st = uiStroke(btn, primary and Color3.fromRGB(255, 140, 160) or Color3.fromRGB(150, 30, 55), 1.4, 0.3)
+	uiGradient(btn, {
+		ColorSequenceKeypoint.new(0, primary and Color3.fromRGB(255, 70, 95) or Color3.fromRGB(74, 12, 26)),
+		ColorSequenceKeypoint.new(1, primary and Color3.fromRGB(150, 5, 22) or Color3.fromRGB(24, 2, 6)),
+	}, 90)
+	local chipSize = math.min(opts.h - 14, opts.iconSize or 30)
+	local tone = TONE[opts.tone] or TONE.neutral
+	local chipPlate, chipTint
+	if primary then
+		chipPlate = Color3.fromRGB(132, 10, 34)
+		chipTint = Color3.fromRGB(255, 255, 255)
+	else
+		chipPlate = tone.plate
+		chipTint = tone.glyph
+	end
+	local chip = iconChip(btn, 12, math.floor((opts.h - chipSize) / 2), chipSize, opts.icon, {
+		z = z + 1, bg = chipPlate, bgTrans = 0.1, tint = chipTint,
+	})
+
+	local shine = New("Frame", {
+		Position = UDim2.new(0, 0, 0, 4),
+		Size = UDim2.new(0, 30, 1, -8),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.88,
+		BorderSizePixel = 0,
+		Rotation = 14,
+		ZIndex = z + 1,
+		Parent = btn,
+	})
+	corner(shine, 8)
+	TweenService:Create(shine, TweenInfo.new(2.6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, false, 0.7), {
+		Position = UDim2.new(1, -30, 0, 4),
+	}):Play()
+	local gap = 12 + chipSize + 8
+	local lbl = label(btn, {
+		Position = UDim2.new(0, gap, 0, 0),
+		Size = UDim2.new(1, -(gap + 12), 1, 0),
+		Text = opts.text,
+		Font = Enum.Font.GothamBold,
+		TextSize = opts.textSize or 14,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = z + 2,
+	})
+	local press = New("Frame", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = z + 3,
+		Parent = btn,
+	})
+	corner(press, opts.radius or 12)
+	local baseSize = UDim2.new(0, opts.w, 0, opts.h)
+
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+			BackgroundColor3 = primary and Color3.fromRGB(255, 65, 92) or Color3.fromRGB(58, 8, 18)
+		}):Play()
+		TweenService:Create(st, TweenInfo.new(0.15), {
+			Color = Color3.fromRGB(255, 225, 230), Transparency = 0
+		}):Play()
+	end)
+	local function restoreIdle()
+		TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+			BackgroundColor3 = primary and Color3.fromRGB(215, 20, 45) or Color3.fromRGB(38, 5, 12)
+		}):Play()
+		TweenService:Create(st, TweenInfo.new(0.15), {
+			Color = primary and Color3.fromRGB(255, 140, 160) or Color3.fromRGB(150, 30, 55),
+			Transparency = 0.3
+		}):Play()
+		TweenService:Create(press, TweenInfo.new(0.12), {BackgroundTransparency = 1}):Play()
+		TweenService:Create(btn, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = baseSize}):Play()
+	end
+	btn.MouseLeave:Connect(restoreIdle)
+
+	btn.MouseButton1Down:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.05), {Size = UDim2.new(0, opts.w - 3, 0, opts.h - 3)}):Play()
+		TweenService:Create(press, TweenInfo.new(0.05), {BackgroundTransparency = 0.8}):Play()
+	end)
+	btn.MouseButton1Up:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = baseSize}):Play()
+		TweenService:Create(press, TweenInfo.new(0.14), {BackgroundTransparency = 1}):Play()
+		if touchMode then
+			task.delay(0.16, restoreIdle)
+		end
+	end)
+	return btn, lbl, chip
+end
+
+local function hDivider(parent, x, y, w, h, z)
+	local d = New("Frame", {
+		Position = UDim2.new(0, x, 0, y),
+		Size = UDim2.new(0, w, 0, h or 1),
+		BackgroundColor3 = Color3.fromRGB(255, 70, 95),
+		BackgroundTransparency = 0.2,
+		BorderSizePixel = 0,
+		ZIndex = z or 18,
+		Parent = parent,
+	})
+	uiGradient(d, {
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1)),
+	}, 0, NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0.15),
+		NumberSequenceKeypoint.new(1, 1),
+	}))
+	return d
+end
+
+local function vDivider(parent, x, y, h, z)
+	z = z or 16
+	local d = New("Frame", {
+		Position = UDim2.new(0, x, 0, y),
+		Size = UDim2.new(0, 2, 0, h),
+		BackgroundColor3 = Color3.fromRGB(255, 70, 95),
+		BackgroundTransparency = 0.5,
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		ZIndex = z,
+		Parent = parent,
+	})
+	uiGradient(d, {
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1)),
+	}, 90, NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	}))
+	local seg = New("Frame", {
+		Size = UDim2.new(1, 0, 0, 150),
+		Position = UDim2.new(0, 0, 0, -150),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 0.15,
+		BorderSizePixel = 0,
+		ZIndex = z + 1,
+		Parent = d,
+	})
+	corner(seg, 3)
+	TweenService:Create(seg, TweenInfo.new(2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true, 0.4), {
+		Position = UDim2.new(0, 0, 0, h)
+	}):Play()
+	return d
+end
+
+local function card(parent, x, y, w, h, opts)
+	opts = opts or {}
+	local f = New("Frame", {
+		Position = UDim2.new(0, x, 0, y),
+		Size = UDim2.new(0, w, 0, h),
+		BackgroundColor3 = opts.bg or C.card,
+		BackgroundTransparency = opts.trans or 0.16,
+		BorderSizePixel = 0,
+		ZIndex = opts.z or 15,
+		Parent = parent,
+	})
+	corner(f, opts.radius or 14)
+	uiStroke(f, opts.strokeColor or Color3.fromRGB(150, 20, 45), opts.strokeThickness or 1.4, opts.strokeTrans or 0.4)
+	uiGradient(f, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(56, 7, 16)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(16, 1, 4)),
+	}, 115)
+	return f
+end
+
+local function createParticles(parent, count, color)
+	if not parent then return end
+	for _ = 1, count do
+		local p = New("Frame", {
+			Size = UDim2.new(0, math.random(3, 8), 0, math.random(3, 8)),
+			Position = UDim2.new(math.random() * 0.8 + 0.1, 0, math.random() * 0.8 + 0.1, 0),
+			BackgroundColor3 = color or C.particle,
+			BackgroundTransparency = 0.1,
+			BorderSizePixel = 0,
+			ZIndex = 45,
+			Parent = parent,
+		})
+		corner(p, 8)
+		local t = TweenService:Create(p, TweenInfo.new(math.random(10, 25) / 10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = UDim2.new(math.random() * 0.9, 0, math.random() * 0.9, 0),
+			BackgroundTransparency = 1,
+			Size = UDim2.new(0, math.random(1, 3), 0, math.random(1, 3)),
+			Rotation = math.random(-360, 360),
+		})
+		t:Play()
+		t.Completed:Connect(function()
+			if p then p:Destroy() end
+		end)
+	end
+end
+
+local function addStarBackground(parent, z)
+	z = z or 11
+	for _ = 1, 55 do
+		local sz = math.random(1, 3)
+		local star = New("Frame", {
+			Size = UDim2.new(0, sz, 0, sz),
+			Position = UDim2.new(math.random(), 0, math.random(), 0),
+			BackgroundColor3 = Color3.fromRGB(255, math.random(110, 210), math.random(110, 160)),
+			BackgroundTransparency = math.random(3, 8) / 10,
+			BorderSizePixel = 0,
+			ZIndex = z,
+			Parent = parent,
+		})
+		corner(star, 8)
+		task.delay(math.random(0, 30) / 10, function()
+			if not star.Parent then return end
+			TweenService:Create(star, TweenInfo.new(math.random(8, 20) / 10, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+				BackgroundTransparency = math.random(7, 10) / 10,
+			}):Play()
+		end)
+	end
+end
+
+local function fadeGroup(root, delayTime, duration)
+	duration = duration or 0.4
+	local saved = {}
+
+	local function visit(d)
+		if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+			saved[#saved + 1] = {inst = d, kind = "text", a = d.TextTransparency, b = d.TextStrokeTransparency}
+			d.TextTransparency = 1
+			d.TextStrokeTransparency = 1
+		elseif d:IsA("ImageLabel") then
+			saved[#saved + 1] = {inst = d, kind = "image", a = d.ImageTransparency}
+			d.ImageTransparency = 1
+		elseif d:IsA("Frame") and d.BackgroundTransparency < 1 then
+			saved[#saved + 1] = {inst = d, kind = "bg", a = d.BackgroundTransparency}
+			d.BackgroundTransparency = 1
+		elseif d:IsA("UIStroke") then
+			saved[#saved + 1] = {inst = d, kind = "stroke", a = d.Transparency}
+			d.Transparency = 1
+		end
+		for _, c in ipairs(d:GetChildren()) do
+			visit(c)
+		end
+	end
+	if not pcall(visit, root) then
+		for _, it in ipairs(saved) do
+			local inst = it.inst
+			if inst.Parent then
+				if it.kind == "text" then
+					inst.TextTransparency = it.a
+					inst.TextStrokeTransparency = it.b
+				elseif it.kind == "image" then
+					inst.ImageTransparency = it.a
+				elseif it.kind == "bg" then
+					inst.BackgroundTransparency = it.a
+				else
+					inst.Transparency = it.a
+				end
+			end
+		end
+		warn("[Syniox] fadeGroup rolled back after an error")
+		return
+	end
+
+	task.delay(delayTime or 0, function()
+		local tw = TweenInfo.new(duration, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		for _, it in ipairs(saved) do
+			local inst = it.inst
+			if inst.Parent then
+				if it.kind == "text" then
+					TweenService:Create(inst, tw, {TextTransparency = it.a, TextStrokeTransparency = it.b}):Play()
+				elseif it.kind == "image" then
+					TweenService:Create(inst, tw, {ImageTransparency = it.a}):Play()
+				elseif it.kind == "bg" then
+					TweenService:Create(inst, tw, {BackgroundTransparency = it.a}):Play()
+				else
+					TweenService:Create(inst, tw, {Transparency = it.a}):Play()
+				end
+			end
+		end
+	end)
+end
+
+local function addFooterLine(parent, z)
+	z = z or 20
+	local line = New("Frame", {
+		Position = UDim2.new(0, 18, 1, -6),
+		Size = UDim2.new(1, -36, 0, 3),
+		BackgroundColor3 = Color3.fromRGB(255, 70, 95),
+		BackgroundTransparency = 0.3,
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		ZIndex = z,
+		Parent = parent,
+	})
+	corner(line, 3)
+	uiGradient(line, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 70)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 176, 60)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 40, 70)),
+	}, 0)
+	TweenService:Create(line, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+		BackgroundTransparency = 0.78,
+	}):Play()
+
+	local spark = New("Frame", {
+		Position = UDim2.new(0, -80, 0, 0),
+		Size = UDim2.new(0, 80, 1, 0),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.3,
+		BorderSizePixel = 0,
+		ZIndex = z + 1,
+		Parent = line,
+	})
+	corner(spark, 3)
+	TweenService:Create(spark, TweenInfo.new(2.6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, false, 0), {
+		Position = UDim2.new(1, 80, 0, 0),
+	}):Play()
+	return line
+end
+
+local function addGradientOverlay(parent, z)
+	local overlay = New("Frame", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(255, 0, 0),
+		BackgroundTransparency = 0.93,
+		BorderSizePixel = 0,
+		ZIndex = z or 13,
+		Parent = parent,
+	})
+	local g = uiGradient(overlay, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 0, 0)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0)),
+	}, 135)
+	TweenService:Create(g, TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Rotation = 315}):Play()
+end
+
+local function makeMainFrame(parent, w, h, name)
+	local gui = New("Frame", {
+		Name = name,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(0, w, 0, h),
+		BackgroundColor3 = C.bg,
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		ClipsDescendants = false,
+		Active = true,
+		Draggable = true,
+		ZIndex = 10,
+		Parent = parent,
+	})
+	corner(gui, 18)
+	local st = uiStroke(gui, C.accent, 2.5)
+	local borderGrad = uiGradient(st, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 110)),
+		ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 0, 40)),
+		ColorSequenceKeypoint.new(0.6, Color3.fromRGB(190, 0, 25)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 90, 110)),
+	}, 0)
+	TweenService:Create(borderGrad, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
+	TweenService:Create(st, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Thickness = 4.5}):Play()
+
+	local glow = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(1, 40, 1, 40),
+		BackgroundColor3 = C.glow,
+		BackgroundTransparency = 0.87,
+		BorderSizePixel = 0,
+		ZIndex = 9,
+		Parent = gui,
+	})
+	corner(glow, 30)
+	TweenService:Create(glow, TweenInfo.new(2.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+		BackgroundTransparency = 0.72,
+		Size = UDim2.new(1, 56, 1, 56),
+	}):Play()
+
+	addStarBackground(gui, 11)
+	addGradientOverlay(gui, 13)
+	return gui
+end
+
+local function makeTopBar(parent, title, subtitle)
+	local bar = New("Frame", {
+		Size = UDim2.new(1, 0, 0, 46),
+		BackgroundColor3 = C.bar,
+		BackgroundTransparency = 0.12,
+		BorderSizePixel = 0,
+		ZIndex = 14,
+		Parent = parent,
+	})
+	corner(bar, 18)
+	uiGradient(bar, {
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(46, 5, 12)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 1, 4)),
+	}, 90)
+	local line = New("Frame", {
+		Position = UDim2.new(0, 14, 1, -1),
+		Size = UDim2.new(1, -28, 0, 1),
+		BackgroundColor3 = Color3.fromRGB(255, 70, 95),
+		BackgroundTransparency = 0.45,
+		BorderSizePixel = 0,
+		ZIndex = 16,
+		Parent = bar,
+	})
+	uiGradient(line, {
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1)),
+	}, 0, NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	}))
+	iconChip(bar, 12, 7, 32, ICON.flame, {z = 17, tone = "red"})
+	local t = label(bar, {
+		Position = UDim2.new(0, 54, 0, 5),
+		Size = UDim2.new(0, 240, 0, 19),
+		Text = title,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextStrokeColor3 = C.accent,
+		TextStrokeTransparency = 0.55,
+		ZIndex = 18,
+	})
+	local s = label(bar, {
+		Position = UDim2.new(0, 54, 0, 24),
+		Size = UDim2.new(0, 340, 0, 15),
+		Text = subtitle,
+		TextSize = 10,
+		TextColor3 = C.dim,
+		ZIndex = 18,
+	})
+	local infoChip = New("Frame", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -96, 0.5, 0),
+		Size = UDim2.new(0, 168, 0, 26),
+		BackgroundColor3 = Color3.fromRGB(40, 6, 14),
+		BackgroundTransparency = 0.2,
+		BorderSizePixel = 0,
+		ZIndex = 18,
+		Parent = bar,
+	})
+	corner(infoChip, 13)
+	uiStroke(infoChip, Color3.fromRGB(150, 30, 55), 1, 0.5)
+
+	local liveDot = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, 16, 0.5, 0),
+		Size = UDim2.new(0, 8, 0, 8),
+		BackgroundColor3 = C.green,
+		BorderSizePixel = 0,
+		ZIndex = 20,
+		Parent = infoChip,
+	})
+	corner(liveDot, 8)
+	TweenService:Create(liveDot, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+		Size = UDim2.new(0, 13, 0, 13),
+		BackgroundTransparency = 0.45,
+	}):Play()
+
+	label(infoChip, {
+		Position = UDim2.new(0, 30, 0, 0),
+		Size = UDim2.new(0, 34, 1, 0),
+		Text = "LIVE",
+		Font = Enum.Font.GothamBold,
+		TextSize = 9,
+		TextColor3 = C.green,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 20,
+	})
+	local clockLbl = label(infoChip, {
+		Position = UDim2.new(0, 66, 0, 0),
+		Size = UDim2.new(1, -72, 1, 0),
+		Text = "--:--:--",
+		Font = Enum.Font.Code,
+		TextSize = 11,
+		TextColor3 = C.text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 20,
+	})
+	task.spawn(function()
+		while bar.Parent do
+			local ok, stamp = pcall(function() return os.date("%H:%M:%S") end)
+			clockLbl.Text = (ok and type(stamp) == "string" and stamp) or "--:--:--"
+			task.wait(1)
+		end
+	end)
+
+	return bar, t, s
+end
+
+local function makeAvatar(parent, cx, cy, r, imageId)
+	local ring = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, cx, 0, cy),
+		Size = UDim2.new(0, r * 2 + 26, 0, r * 2 + 26),
+		BackgroundColor3 = C.accent,
+		BackgroundTransparency = 0.55,
+		BorderSizePixel = 0,
+		ZIndex = 16,
+		Parent = parent,
+	})
+	corner(ring, 200)
+	uiStroke(ring, C.accent, 2, 0.4)
+
+	local ring2 = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(1, -14, 1, -14),
+		BackgroundColor3 = Color3.fromRGB(255, 90, 120),
+		BackgroundTransparency = 0.7,
+		BorderSizePixel = 0,
+		ZIndex = 17,
+		Parent = ring,
+	})
+	corner(ring2, 200)
+	TweenService:Create(ring2, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+		BackgroundTransparency = 0.9,
+	}):Play()
+
+	local comet = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, 8),
+		Size = UDim2.new(0, 14, 0, 14),
+		BackgroundColor3 = Color3.fromRGB(255, 60, 90),
+		BorderSizePixel = 0,
+		ZIndex = 19,
+		Parent = ring,
+	})
+	corner(comet, 200)
+	local cometImg = New("ImageLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(0, 22, 0, 22),
+		BackgroundTransparency = 1,
+		Image = ICON.star,
+		ImageColor3 = Color3.fromRGB(255, 200, 210),
+		ImageTransparency = 0.35,
+		ZIndex = 20,
+		Parent = comet,
+	})
+	TweenService:Create(comet, TweenInfo.new(3.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true, 0), {
+		Position = UDim2.new(0.5, 0, 0, r * 2 - 8),
+	}):Play()
+
+	local halo = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(1, 34, 1, 34),
+		BackgroundColor3 = C.accent,
+		BackgroundTransparency = 0.85,
+		BorderSizePixel = 0,
+		ZIndex = 15,
+		Parent = ring,
+	})
+	corner(halo, 200)
+	TweenService:Create(halo, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+		BackgroundTransparency = 0.6,
+		Size = UDim2.new(1, 46, 1, 46),
+	}):Play()
+
+	local holder = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0, cx, 0, cy),
+		Size = UDim2.new(0, r * 2, 0, r * 2),
+		BackgroundColor3 = Color3.fromRGB(30, 4, 10),
+		BorderSizePixel = 0,
+		ZIndex = 20,
+		Parent = parent,
+	})
+	corner(holder, 200)
+	local st = uiStroke(holder, Color3.fromRGB(255, 255, 255), 2, 0.35)
+
+	local img = New("ImageLabel", {
+		Size = UDim2.new(1, -8, 1, -8),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		BackgroundColor3 = Color3.fromRGB(40, 5, 12),
+		BorderSizePixel = 0,
+		Image = imageId,
+		ScaleType = Enum.ScaleType.Crop,
+		ZIndex = 21,
+		Parent = holder,
+	})
+	corner(img, 200)
+
+	local dot = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -6, 1, -6),
+		Size = UDim2.new(0, 20, 0, 20),
+		BackgroundColor3 = C.green,
+		BorderSizePixel = 0,
+		ZIndex = 24,
+		Parent = holder,
+	})
+	corner(dot, 200)
+	uiStroke(dot, Color3.fromRGB(10, 1, 3), 3, 0)
+	local dotPulse = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = C.green,
+		BackgroundTransparency = 0.5,
+		BorderSizePixel = 0,
+		ZIndex = 23,
+		Parent = dot,
+	})
+	corner(dotPulse, 200)
+	TweenService:Create(dotPulse, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+		Size = UDim2.new(1, 14, 1, 14),
+		BackgroundTransparency = 1,
+	}):Play()
+
+	TweenService:Create(st, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+		Color = Color3.fromRGB(255, 150, 170),
+	}):Play()
+
+	return holder, img, dot
+end
+
+local function makeTitleBtn(parent, x, icon, onClick, kind)
+	local isClose = kind == "close"
+	local bg    = isClose and Color3.fromRGB(198, 26, 56) or Color3.fromRGB(196, 122, 12)
+	local hover = isClose and Color3.fromRGB(244, 54, 88) or Color3.fromRGB(236, 156, 40)
+
+	local btn = New("TextButton", {
+		Position = UDim2.new(0, x, 0, 8),
+		Size = UDim2.new(0, 30, 0, 30),
+		BackgroundColor3 = bg,
+		BackgroundTransparency = 0.04,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		ZIndex = 18,
+		Parent = parent,
+	})
+	corner(btn, 9)
+	local st = uiStroke(btn, Color3.fromRGB(255, 255, 255), 1.2, 0.45)
+	local chip, img = iconChip(btn, 4, 4, 22, icon, {
+		z = 19, radius = 7, iconScale = 0.68,
+		bg = bg, bgTrans = 0, tint = Color3.fromRGB(255, 255, 255),
+	})
+	local baseSize = UDim2.new(0, 30, 0, 30)
+
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = hover}):Play()
+		TweenService:Create(chip, TweenInfo.new(0.12), {BackgroundColor3 = hover}):Play()
+		TweenService:Create(st, TweenInfo.new(0.12), {Transparency = 0.15, Color = Color3.fromRGB(255, 240, 245)}):Play()
+	end)
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = bg}):Play()
+		TweenService:Create(chip, TweenInfo.new(0.15), {BackgroundColor3 = bg}):Play()
+		TweenService:Create(st, TweenInfo.new(0.15), {Transparency = 0.45, Color = Color3.fromRGB(255, 255, 255)}):Play()
+		TweenService:Create(btn, TweenInfo.new(0.15), {Size = baseSize}):Play()
+	end)
+	btn.MouseButton1Down:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.05), {Size = UDim2.new(0, 27, 0, 27)}):Play()
+	end)
+	btn.MouseButton1Up:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = baseSize}):Play()
+		if touchMode then
+			task.delay(0.16, function()
+				if btn.Parent then
+					TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = bg}):Play()
+					TweenService:Create(chip, TweenInfo.new(0.18), {BackgroundColor3 = bg}):Play()
+					TweenService:Create(st, TweenInfo.new(0.18), {Transparency = 0.45, Color = Color3.fromRGB(255, 255, 255)}):Play()
+				end
+			end)
+		end
+	end)
+	if onClick then
+		btn.MouseButton1Click:Connect(onClick)
+	end
+	return btn
+end
+
+local ScreenGui = New("ScreenGui", {
+	Name = "SynioxHub",
+	ResetOnSpawn = false,
+	IgnoreGuiInset = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Global,
+	DisplayOrder = 999,
+	Parent = PlayerGui,
+})
+
+local fitted = {}
+
+local function screenSize()
+	local ok, sz = pcall(function()
+		local s = ScreenGui.AbsoluteSize
+		if s.X > 50 and s.Y > 50 then return s end
+		return nil
+	end)
+	if ok and sz then return sz end
+	local ok2, vs = pcall(function()
+		local v = workspace.CurrentCamera.ViewportSize
+		if v.X > 50 and v.Y > 50 then return v end
+		return nil
+	end)
+	if ok2 and vs then return vs end
+	return Vector2.new(1280, 720)
+end
+
+local function fitFor(w, h, sz)
+	local s = math.min((sz.X - 18) / w, (sz.Y - 18) / h, 1)
+	if s ~= s or s <= 0 then s = 1 end
+	if s < 0.34 then s = 0.34 end
+	return s
+end
+
+local function applyFit(instant)
+	local sz = screenSize()
+	for _, e in ipairs(fitted) do
+		local target = fitFor(e.w, e.h, sz)
+		if target ~= e.cur then
+			e.cur = target
+			if instant then
+				e.comp.Scale = target
+			else
+				TweenService:Create(e.comp, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+					Scale = target,
+				}):Play()
+			end
+		end
+	end
+end
+
+local function attachFit(frame, w, h)
+	local sc = New("UIScale", {Scale = 1, Parent = frame})
+	local entry = {comp = sc, w = w, h = h, cur = 1}
+	fitted[#fitted + 1] = entry
+	applyFit(true)
+	return entry
+end
+
+local KeyFrame = makeMainFrame(ScreenGui, KEY_W, KEY_H, "SynioxKey")
+local keyFit = attachFit(KeyFrame, KEY_W, KEY_H)
+addFooterLine(KeyFrame, 20)
+
+local restoreBtn
+restoreBtn = iconButton(ScreenGui, 0, 0, 46, ICON.flame, function()
+	restoreBtn.Visible = false
+	KeyFrame.ClipsDescendants = false
+	KeyFrame.Visible = true
+	KeyFrame.Size = UDim2.new(0, 80, 0, 80)
+	KeyFrame.BackgroundTransparency = 1
+	TweenService:Create(KeyFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Size = UDim2.new(0, KEY_W, 0, KEY_H),
+		BackgroundTransparency = 0.1,
+	}):Play()
+end, {z = 60, radius = 200, bg = C.accent, bgTrans = 0, tint = Color3.fromRGB(255, 255, 255)})
+restoreBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+restoreBtn.Position = UDim2.new(1, -56, 1, -56)
+restoreBtn.Visible = false
+
+local topBar, titleLbl, subLbl = makeTopBar(KeyFrame, "SYNIOX HUB", "Security verification  •  " .. VERSION)
+
+local function addThemeButton(parent, x, y, roots)
+	local button, image = iconButton(parent, x, y, 30, ICON.palette, function(chip, img)
+		local name = nextTheme()
+		applyTheme(name, roots)
+		showToast(KeyFrame, "Theme changed  •  " .. name, "info")
+	end, {z = 19, radius = 9, tone = "blue", iconScale = 0.62})
+	return button, image
+end
+
+local function minimizeWindow()
+	KeyFrame.ClipsDescendants = true
+	local t = TweenService:Create(KeyFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Size = UDim2.new(0, 120, 0, 46),
+		BackgroundTransparency = 1,
+	})
+	t:Play()
+	t.Completed:Connect(function()
+		KeyFrame.Visible = false
+		KeyFrame.Size = UDim2.new(0, KEY_W, 0, KEY_H)
+		KeyFrame.BackgroundTransparency = 0.1
+		restoreBtn.Visible = true
+	end)
+end
+
+local function closeWindow()
+	createParticles(KeyFrame, 18, C.accent)
+	local t = TweenService:Create(KeyFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, KEY_W + 60, 0, KEY_H + 60),
+	})
+	t:Play()
+	task.delay(0.4, function()
+		KeyFrame:Destroy()
+	end)
+end
+
+makeTitleBtn(KeyFrame, KEY_W - 44, ICON.x, closeWindow, "close")
+makeTitleBtn(KeyFrame, KEY_W - 78, ICON.minus, minimizeWindow, "min")
+addThemeButton(KeyFrame, KEY_W - 112, 8, {ScreenGui})
+
+local profX, profY, profW, profH = 14, 58, 286, 388
+local ProfileCard = card(KeyFrame, profX, profY, profW, profH, {z = 15})
+
+local avatarId = "rbxthumb://type=HeadShot&userid=" .. Player.UserId .. "&width=420&height=420"
+do
+	local ok, url = pcall(function()
+		return Players:GetUserThumbnailAsync(Player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+	end)
+	if ok and type(url) == "string" and url ~= "" then avatarId = url end
+end
+local AV_R = 62
+makeAvatar(ProfileCard, profW / 2, 84, AV_R, avatarId)
+
+label(ProfileCard, {
+	Position = UDim2.new(0, 8, 0, 152),
+	Size = UDim2.new(1, -16, 0, 20),
+	Text = Player.DisplayName,
+	Font = Enum.Font.GothamBold,
+	TextSize = 17,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	ZIndex = 22,
+})
+label(ProfileCard, {
+	Position = UDim2.new(0, 8, 0, 173),
+	Size = UDim2.new(1, -16, 0, 15),
+	Text = "@" .. Player.Name,
+	TextSize = 11,
+	TextColor3 = C.accent,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	ZIndex = 22,
+})
+hDivider(ProfileCard, 22, 197, profW - 44, 1, 18)
+
+local rows = {}
+local rowFrames = {}
+local function addInfoRow(y, icon, caption, value, masked)
+	local rf = New("Frame", {
+		Name = "InfoRow",
+		Position = UDim2.new(0, 10, 0, y),
+		Size = UDim2.new(1, -20, 0, 32),
+		BackgroundColor3 = Color3.fromRGB(40, 5, 13),
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		ZIndex = 20,
+		Parent = ProfileCard,
+	})
+	corner(rf, 10)
+	uiStroke(rf, Color3.fromRGB(120, 16, 36), 1, 0.55)
+
+	iconChip(rf, 6, 6, 20, icon, {z = 21, radius = 6, iconScale = 0.62, tone = "red"})
+
+	label(rf, {
+		Position = UDim2.new(0, 32, 0, 3),
+		Size = UDim2.new(0, 130, 0, 10),
+		Text = caption,
+		Font = Enum.Font.GothamBold,
+		TextSize = 8,
+		TextColor3 = C.dim,
+		TextStrokeTransparency = 1,
+		ZIndex = 22,
+	})
+	local val = label(rf, {
+		Position = UDim2.new(0, 32, 0, 13),
+		Size = UDim2.new(0, 172, 0, 15),
+		Text = tostring(value),
+		Font = Enum.Font.Code,
+		TextSize = 11,
+		TextColor3 = C.text,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 22,
+	})
+
+	local entry = {labelRef = val, value = tostring(value), hidden = false}
+
+	local rowW = profW - 20
+
+	iconButton(rf, rowW - 56, 4, 24, ICON.copy, function(chip, img)
+		safeSetClipboard(entry.value)
+		flashCopied(img, chip)
+		showToast(KeyFrame, "Copied  —  " .. entry.value, "success")
+	end, {z = 23, radius = 7, iconScale = 0.6, tone = "green"})
+
+	local eyeChip, eyeImg = iconButton(rf, rowW - 28, 4, 24, ICON.eye, function(chip, img)
+		entry.hidden = not entry.hidden
+		val.Text = entry.hidden and maskValue(entry.value) or entry.value
+		img.Image = entry.hidden and ICON.eyeOff or ICON.eye
+		showToast(KeyFrame, entry.hidden and "Value hidden" or "Value revealed", "info")
+	end, {z = 23, radius = 7, iconScale = 0.6, tone = "blue"})
+
+	if masked then
+		entry.hidden = true
+		val.Text = maskValue(entry.value)
+		eyeImg.Image = ICON.eyeOff
+	end
+
+	table.insert(rows, entry)
+	table.insert(rowFrames, rf)
+	return rf
+end
+
+addInfoRow(206, ICON.hash,      "ACCOUNT ID",      Player.UserId, false)
+addInfoRow(240, ICON.atSign,    "USERNAME", Player.Name, false)
+addInfoRow(274, ICON.user,      "DISPLAY NAME",    Player.DisplayName, false)
+addInfoRow(308, ICON.server,    "SERVER ID",     (game.JobId ~= "" and game.JobId:sub(1, 8) or "Unknown"), false)
+
+local allBtn, allBtnLbl, allBtnChip = makeButton(ProfileCard, {
+	x = 10, y = 348, w = profW - 20, h = 30,
+	text = "Copy all info", icon = ICON.clipboard,
+	textSize = 12, z = 22, radius = 10, kind = "ghost", iconSize = 22, tone = "green",
+})
+allBtn.MouseButton1Click:Connect(function()
+	local lines = {}
+	for _, e in ipairs(rows) do table.insert(lines, e.value) end
+	safeSetClipboard(table.concat(lines, " | "))
+	flashCopied(allBtnChip:FindFirstChildOfClass("ImageLabel"), allBtnChip)
+	showToast(KeyFrame, "All account info copied", "success")
+end)
+
+local rx, rw = 314, 532
+
+label(KeyFrame, {
+	Position = UDim2.new(0, rx, 0, 66),
+	Size = UDim2.new(0, 300, 0, 22),
+	Text = "KEY VERIFICATION",
+	Font = Enum.Font.GothamBold,
+	TextSize = 17,
+	TextStrokeColor3 = C.accent,
+	TextStrokeTransparency = 0.6,
+	ZIndex = 20,
+})
+label(KeyFrame, {
+	Position = UDim2.new(0, rx, 0, 86),
+	Size = UDim2.new(0, 340, 0, 13),
+	Text = "Paste your copied key into the field below",
+	TextSize = 10,
+	TextColor3 = C.dim,
+	ZIndex = 20,
+})
+
+local StatusPill = New("Frame", {
+	Position = UDim2.new(0, rx + rw - 176, 0, 64),
+	Size = UDim2.new(0, 176, 0, 30),
+	BackgroundColor3 = Color3.fromRGB(40, 6, 14),
+	BackgroundTransparency = 0.2,
+	BorderSizePixel = 0,
+	ZIndex = 21,
+	Parent = KeyFrame,
+})
+corner(StatusPill, 15)
+local pillStroke = uiStroke(StatusPill, Color3.fromRGB(150, 40, 65), 1.4, 0.35)
+TweenService:Create(pillStroke, TweenInfo.new(1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Thickness = 2.4,
+	Transparency = 0.15,
+}):Play()
+local StatusDot = New("Frame", {
+	Position = UDim2.new(0, 10, 0.5, -5),
+	Size = UDim2.new(0, 10, 0, 10),
+	BackgroundColor3 = C.dim,
+	BorderSizePixel = 0,
+	ZIndex = 23,
+	Parent = StatusPill,
+})
+corner(StatusDot, 10)
+local StatusText = label(StatusPill, {
+	Position = UDim2.new(0, 27, 0, 0),
+	Size = UDim2.new(1, -34, 1, 0),
+	Text = "IDLE",
+	Font = Enum.Font.GothamBold,
+	TextSize = 11,
+	TextColor3 = C.dim,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ZIndex = 23,
+})
+
+local function setStatus(kind)
+	if kind == "ok" then
+		StatusText.Text = "VERIFIED"
+		StatusText.TextColor3 = C.green
+		StatusDot.BackgroundColor3 = C.green
+		pillStroke.Color = C.greenDim
+	elseif kind == "bad" then
+		StatusText.Text = "INVALID KEY"
+		StatusText.TextColor3 = Color3.fromRGB(255, 90, 110)
+		StatusDot.BackgroundColor3 = Color3.fromRGB(255, 90, 110)
+		pillStroke.Color = Color3.fromRGB(150, 30, 55)
+	elseif kind == "load" then
+		StatusText.Text = "VERIFYING..."
+		StatusText.TextColor3 = Color3.fromRGB(255, 210, 90)
+		StatusDot.BackgroundColor3 = Color3.fromRGB(255, 210, 90)
+		pillStroke.Color = Color3.fromRGB(150, 110, 30)
+	else
+		StatusText.Text = "IDLE"
+		StatusText.TextColor3 = C.dim
+		StatusDot.BackgroundColor3 = C.dim
+		pillStroke.Color = Color3.fromRGB(150, 40, 65)
+	end
+end
+
+hDivider(KeyFrame, rx, 104, rw, 1, 18)
+
+local inputFrame = New("Frame", {
+	Position = UDim2.new(0, rx, 0, 120),
+	Size = UDim2.new(0, rw, 0, 62),
+	BackgroundColor3 = Color3.fromRGB(30, 4, 11),
+	BackgroundTransparency = 0.15,
+	BorderSizePixel = 0,
+	ZIndex = 20,
+	Parent = KeyFrame,
+})
+corner(inputFrame, 14)
+local inputStroke = uiStroke(inputFrame, Color3.fromRGB(140, 24, 48), 1.6, 0.35)
+iconChip(inputFrame, 12, 15, 32, ICON.key, {z = 22, radius = 9, tone = "amber"})
+
+local KeyBox = New("TextBox", {
+	Position = UDim2.new(0, 56, 0, 8),
+	Size = UDim2.new(1, -140, 1, -16),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Font = Enum.Font.Code,
+	PlaceholderText = "Paste your key here...",
+	PlaceholderColor3 = Color3.fromRGB(140, 105, 115),
+	Text = "",
+	TextColor3 = C.text,
+	TextSize = 15,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ClearTextOnFocus = false,
+	ZIndex = 23,
+	Parent = inputFrame,
+})
+KeyBox.TextTruncate = Enum.TextTruncate.AtEnd
+
+iconButton(inputFrame, rw - 74, 15, 32, ICON.clipboard, function(chip, img)
+	local clip = readClipboard()
+	if clip and clip ~= "" then
+		KeyBox.Text = clip
+		flashCopied(img, chip)
+		showToast(KeyFrame, "Pasted from clipboard", "success")
+	else
+		showToast(KeyFrame, "Clipboard empty or unavailable", "error")
+	end
+end, {z = 23, radius = 9, tone = "green"})
+iconButton(inputFrame, rw - 38, 15, 32, ICON.eraser, function(chip, img)
+	KeyBox.Text = ""
+	showToast(KeyFrame, "Field cleared", "info")
+end, {z = 23, radius = 9, tone = "amber"})
+
+KeyBox.Focused:Connect(function()
+	TweenService:Create(inputStroke, TweenInfo.new(0.18), {
+		Color = C.accent, Thickness = 2.4, Transparency = 0
+	}):Play()
+end)
+KeyBox.FocusLost:Connect(function()
+	TweenService:Create(inputStroke, TweenInfo.new(0.18), {
+		Color = Color3.fromRGB(140, 24, 48), Thickness = 1.6, Transparency = 0.35
+	}):Play()
+end)
+
+local verifyBtn = makeButton(KeyFrame, {
+	x = rx, y = 196, w = rw, h = 56,
+	text = "VERIFY & ENTER", icon = ICON.unlock, textSize = 15, z = 20,
+})
+
+local halfW = math.floor((rw - 12) / 2)
+local discordBtn = makeButton(KeyFrame, {
+	x = rx, y = 266, w = halfW, h = 50,
+	text = "DISCORD", icon = ICON.message, textSize = 13, kind = "ghost", z = 20, tone = "blue",
+})
+local keyBtn = makeButton(KeyFrame, {
+	x = rx + halfW + 12, y = 266, w = halfW, h = 50,
+	text = "GET KEY", icon = ICON.external, textSize = 13, kind = "ghost", z = 20, tone = "amber",
+})
+linkButton(discordBtn, DISCORD_LINK, KeyFrame)
+linkButton(keyBtn, KEY_LINK, KeyFrame)
+
+local infoStrip = card(KeyFrame, rx, 332, rw, 58, {z = 19, trans = 0.3, radius = 12})
+iconChip(infoStrip, 12, 14, 30, ICON.shield, {z = 21, radius = 9, tone = "green"})
+label(infoStrip, {
+	Position = UDim2.new(0, 52, 0, 10),
+	Size = UDim2.new(1, -64, 0, 16),
+	Text = "Your key is never stored on this device",
+	Font = Enum.Font.GothamBold,
+	TextSize = 12,
+	ZIndex = 22,
+})
+label(infoStrip, {
+	Position = UDim2.new(0, 52, 0, 28),
+	Size = UDim2.new(1, -64, 0, 22),
+	Text = "Verification runs locally - no data is ever sent.",
+	TextSize = 10,
+	TextColor3 = C.dim,
+	TextWrapped = true,
+	ZIndex = 22,
+})
+
+label(KeyFrame, {
+	Position = UDim2.new(0, rx, 0, 404),
+	Size = UDim2.new(0, 220, 0, 16),
+	Text = "Syniox Hub  •  " .. VERSION,
+	TextSize = 10,
+	TextColor3 = C.dim,
+	ZIndex = 20,
+})
+local ExecutorLabel = label(KeyFrame, {
+	Position = UDim2.new(0, rx + rw - 300, 0, 404),
+	Size = UDim2.new(0, 300, 0, 16),
+	Text = "Executor: ...",
+	TextSize = 10,
+	TextColor3 = C.dim,
+	TextXAlignment = Enum.TextXAlignment.Right,
+	ZIndex = 20,
+})
+ExecutorLabel.Text = "Executor: " .. getExecutorName()
+
+local microItems = {
+	{icon = ICON.shield, text = "LOCAL VERIFICATION"},
+	{icon = ICON.lock,   text = "NO DATA STORED"},
+	{icon = ICON.check,  text = "SYNIOX SECURE"},
+}
+local microW = math.floor((rw - 22) / 3)
+for i, item in ipairs(microItems) do
+	local pill = New("Frame", {
+		Position = UDim2.new(0, rx + (i - 1) * (microW + 11), 0, 424),
+		Size = UDim2.new(0, microW, 0, 20),
+		BackgroundColor3 = Color3.fromRGB(36, 5, 12),
+		BackgroundTransparency = 0.25,
+		BorderSizePixel = 0,
+		ZIndex = 20,
+		Parent = KeyFrame,
+	})
+	corner(pill, 10)
+	uiStroke(pill, Color3.fromRGB(120, 16, 36), 1, 0.6)
+	iconChip(pill, 3, 3, 14, item.icon, {z = 22, radius = 5, iconScale = 0.6, tone = "red"})
+	label(pill, {
+		Position = UDim2.new(0, 22, 0, 0),
+		Size = UDim2.new(1, -26, 1, 0),
+		Text = item.text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 8,
+		TextColor3 = C.sub,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 22,
+	})
+end
+
+local LoaderFrame = makeMainFrame(ScreenGui, LDR_W, LDR_H, "SynioxLoader")
+local loaderFit = attachFit(LoaderFrame, LDR_W, LDR_H)
+addFooterLine(LoaderFrame, 20)
+LoaderFrame.Visible = false
+
+task.spawn(function()
+	pcall(function()
+		ScreenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			applyFit(false)
+		end)
+	end)
+	pcall(function()
+		local cam = workspace.CurrentCamera
+		cam:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+			applyFit(false)
+		end)
+	end)
+	while ScreenGui.Parent do
+		task.wait(1.5)
+		applyFit(false)
+	end
+end)
+
+local LdrTop, LdrTitle, LdrSub = makeTopBar(LoaderFrame, "SYNIOX HUB", "Loading scripts...")
+local LdrSubText = LdrSub.Text
+local function setLdrStatus(text)
+	LdrSubText = text
+	if LdrSub and LdrSub.Parent then LdrSub.Text = text end
+end
+
+makeTitleBtn(LoaderFrame, LDR_W - 44, ICON.x, function()
+	createParticles(LoaderFrame, 18, C.accent)
+	local t = TweenService:Create(LoaderFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, LDR_W + 60, 0, LDR_H + 60),
+	})
+	t:Play()
+	task.delay(0.4, function()
+		ScreenGui:Destroy()
+	end)
+end, "close")
+addThemeButton(LoaderFrame, LDR_W - 112, 8, {ScreenGui})
+local ldrRestore
+ldrRestore = iconButton(ScreenGui, 0, 0, 46, ICON.flame, function()
+	ldrRestore.Visible = false
+	LoaderFrame.ClipsDescendants = false
+	LoaderFrame.Visible = true
+	LoaderFrame.Size = UDim2.new(0, 80, 0, 80)
+	LoaderFrame.BackgroundTransparency = 1
+	TweenService:Create(LoaderFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Size = UDim2.new(0, LDR_W, 0, LDR_H),
+		BackgroundTransparency = 0.1,
+	}):Play()
+end, {z = 61, radius = 200, bg = C.accent, bgTrans = 0, tint = Color3.fromRGB(255, 255, 255)})
+ldrRestore.AnchorPoint = Vector2.new(0.5, 0.5)
+ldrRestore.Position = UDim2.new(1, -112, 1, -56)
+ldrRestore.Visible = false
+
+makeTitleBtn(LoaderFrame, LDR_W - 78, ICON.minus, function()
+	LoaderFrame.ClipsDescendants = true
+	local t = TweenService:Create(LoaderFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Size = UDim2.new(0, 140, 0, 46),
+		BackgroundTransparency = 1,
+	})
+	t:Play()
+	t.Completed:Connect(function()
+		LoaderFrame.Visible = false
+		LoaderFrame.Size = UDim2.new(0, LDR_W, 0, LDR_H)
+		LoaderFrame.BackgroundTransparency = 0.1
+		ldrRestore.Visible = true
+	end)
+end, "min")
+
+local lstX, lstY, lstW, lstH = 14, 58, 610, 508
+local ListCard = card(LoaderFrame, lstX, lstY, lstW, lstH, {z = 15})
+
+local FeaturedBox = New("Frame", {
+	Position = UDim2.new(0, 10, 0, 10),
+	Size = UDim2.new(1, -20, 0, 78),
+	BackgroundColor3 = Color3.fromRGB(48, 6, 16),
+	BackgroundTransparency = 0.2,
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	ZIndex = 18,
+	Parent = ListCard,
+})
+corner(FeaturedBox, 12)
+local featStroke = uiStroke(FeaturedBox, C.accent, 1.6, 0.35)
+uiGradient(FeaturedBox, {
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 8, 20)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 2, 6)),
+}, 115)
+local featGlow = New("Frame", {
+	Size = UDim2.new(0, 160, 1, 0),
+	BackgroundColor3 = Color3.fromRGB(255, 60, 90),
+	BackgroundTransparency = 0.85,
+	BorderSizePixel = 0,
+	Rotation = 20,
+	ZIndex = 19,
+	Parent = FeaturedBox,
+})
+TweenService:Create(featGlow, TweenInfo.new(3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Position = UDim2.new(1, -40, 0, 0),
+	BackgroundTransparency = 0.95,
+}):Play()
+
+local FeaturedIcon = iconChip(FeaturedBox, 12, 22, 34, ICON.gamepad, {
+	z = 21, radius = 10, bg = Color3.fromRGB(132, 10, 34), bgTrans = 0.1, tint = Color3.fromRGB(255, 255, 255),
+})
+local FeaturedTitle = label(FeaturedBox, {
+	Position = UDim2.new(0, 56, 0, 14),
+	Size = UDim2.new(1, -220, 0, 18),
+	Text = "Script found for this game",
+	Font = Enum.Font.GothamBold,
+	TextSize = 14,
+	ZIndex = 22,
+})
+local FeaturedSub = label(FeaturedBox, {
+	Position = UDim2.new(0, 56, 0, 34),
+	Size = UDim2.new(1, -220, 0, 30),
+	Text = "Pick it below to run it instantly",
+	TextSize = 11,
+	TextColor3 = C.sub,
+	TextWrapped = true,
+	ZIndex = 22,
+})
+local FeaturedBtn = New("TextButton", {
+	Position = UDim2.new(1, -154, 0.5, -17),
+	Size = UDim2.new(0, 142, 0, 34),
+	BackgroundColor3 = Color3.fromRGB(215, 20, 45),
+	BorderSizePixel = 0,
+	AutoButtonColor = false,
+	Text = "",
+	ZIndex = 23,
+	Parent = FeaturedBox,
+})
+corner(FeaturedBtn, 10)
+local featBtnStroke = uiStroke(FeaturedBtn, Color3.fromRGB(255, 150, 170), 1.3, 0.35)
+local featGlow2 = New("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(1, 12, 1, 12),
+	BackgroundColor3 = Color3.fromRGB(255, 70, 110),
+	BackgroundTransparency = 0.75,
+	BorderSizePixel = 0,
+	ZIndex = 24,
+	Parent = FeaturedBtn,
+})
+corner(featGlow2, 14)
+TweenService:Create(featGlow2, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Size = UDim2.new(1, 26, 1, 26),
+	BackgroundTransparency = 0.95,
+}):Play()
+iconChip(FeaturedBtn, 8, 5, 24, ICON.play, {
+	z = 24, radius = 7, bg = Color3.fromRGB(132, 10, 34), bgTrans = 0.1, tint = Color3.fromRGB(255, 255, 255),
+})
+local FeaturedBtnLbl = label(FeaturedBtn, {
+	Position = UDim2.new(0, 36, 0, 0),
+	Size = UDim2.new(1, -42, 1, 0),
+	Text = "RUN",
+	Font = Enum.Font.GothamBold,
+	TextSize = 12,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	ZIndex = 25,
+})
+FeaturedBtn.MouseEnter:Connect(function()
+	TweenService:Create(FeaturedBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 65, 92)}):Play()
+	TweenService:Create(featBtnStroke, TweenInfo.new(0.15), {Transparency = 0}):Play()
+end)
+FeaturedBtn.MouseLeave:Connect(function()
+	TweenService:Create(FeaturedBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(215, 20, 45)}):Play()
+	TweenService:Create(featBtnStroke, TweenInfo.new(0.15), {Transparency = 0.35}):Play()
+end)
+
+local searchFrame = New("Frame", {
+	Position = UDim2.new(0, 10, 0, 98),
+	Size = UDim2.new(1, -20, 0, 40),
+	BackgroundColor3 = Color3.fromRGB(32, 4, 11),
+	BackgroundTransparency = 0.2,
+	BorderSizePixel = 0,
+	ZIndex = 18,
+	Parent = ListCard,
+})
+corner(searchFrame, 11)
+local searchStroke = uiStroke(searchFrame, Color3.fromRGB(120, 16, 36), 1.3, 0.5)
+iconChip(searchFrame, 9, 8, 24, ICON.search, {z = 20, radius = 7})
+
+local SearchBox = New("TextBox", {
+	Position = UDim2.new(0, 42, 0, 4),
+	Size = UDim2.new(1, -120, 1, -8),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Font = Enum.Font.Gotham,
+	PlaceholderText = "Search scripts...",
+	PlaceholderColor3 = Color3.fromRGB(140, 105, 115),
+	Text = "",
+	TextColor3 = C.text,
+	TextSize = 13,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ClearTextOnFocus = false,
+	ZIndex = 20,
+	Parent = searchFrame,
+})
+SearchBox.Focused:Connect(function()
+	TweenService:Create(searchStroke, TweenInfo.new(0.18), {Color = C.accent, Transparency = 0}):Play()
+end)
+SearchBox.FocusLost:Connect(function()
+	TweenService:Create(searchStroke, TweenInfo.new(0.18), {Color = Color3.fromRGB(120, 16, 36), Transparency = 0.5}):Play()
+end)
+
+local CountBadge = New("Frame", {
+	Position = UDim2.new(1, -62, 0.5, -11),
+	Size = UDim2.new(0, 54, 0, 22),
+	BackgroundColor3 = Color3.fromRGB(70, 8, 20),
+	BorderSizePixel = 0,
+	ZIndex = 21,
+	Parent = searchFrame,
+})
+corner(CountBadge, 11)
+uiStroke(CountBadge, Color3.fromRGB(150, 30, 55), 1, 0.5)
+local CountText = label(CountBadge, {
+	Size = UDim2.new(1, 0, 1, 0),
+	Text = "0",
+	Font = Enum.Font.GothamBold,
+	TextSize = 11,
+	TextColor3 = C.accent,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	ZIndex = 22,
+})
+
+local ScriptList = New("ScrollingFrame", {
+	Position = UDim2.new(0, 10, 0, 148),
+	Size = UDim2.new(1, -20, 1, -158),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 5,
+	ScrollBarImageColor3 = C.accent,
+	ScrollBarImageTransparency = 0.35,
+	CanvasSize = UDim2.new(0, 0, 0, 0),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ZIndex = 18,
+	Parent = ListCard,
+})
+New("UIListLayout", {
+	Padding = UDim.new(0, 8),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	Parent = ScriptList,
+})
+New("UIPadding", {
+	PaddingBottom = UDim.new(0, 6),
+	Parent = ScriptList,
+})
+
+vDivider(LoaderFrame, lstX + lstW + 16, lstY + 6, lstH - 12, 16)
+
+local gcX, gcY, gcW, gcH = lstX + lstW + 34, lstY, LDR_W - (lstX + lstW + 34) - 14, lstH
+local GameCard = card(LoaderFrame, gcX, gcY, gcW, gcH, {z = 15})
+
+local gameImgHolder = New("Frame", {
+	Position = UDim2.new(0, 12, 0, 12),
+	Size = UDim2.new(1, -24, 0, 138),
+	BackgroundColor3 = Color3.fromRGB(34, 4, 12),
+	BackgroundTransparency = 0.15,
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	ZIndex = 18,
+	Parent = GameCard,
+})
+corner(gameImgHolder, 12)
+local imgStroke = uiStroke(gameImgHolder, Color3.fromRGB(150, 30, 55), 1.4, 0.45)
+TweenService:Create(imgStroke, TweenInfo.new(2.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Thickness = 2.2,
+	Transparency = 0.15,
+}):Play()
+
+local GameImg = New("ImageLabel", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(1.14, 0, 1.14, 0),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Image = "",
+	ImageColor3 = Color3.fromRGB(255, 255, 255),
+	ScaleType = Enum.ScaleType.Crop,
+	ZIndex = 20,
+	Parent = gameImgHolder,
+})
+TweenService:Create(GameImg, TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Size = UDim2.new(1.02, 0, 1.02, 0),
+}):Play()
+local imgFallback = iconChip(gameImgHolder, math.floor((gcW - 24) / 2) - 24, 45, 48, ICON.gamepad, {
+	z = 19, radius = 14, tone = "neutral",
+})
+local imgShade = New("Frame", {
+	Size = UDim2.new(1, 0, 1, 0),
+	BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+	BackgroundTransparency = 0,
+	BorderSizePixel = 0,
+	ZIndex = 21,
+	Parent = gameImgHolder,
+})
+uiGradient(imgShade, {
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 15)),
+}, 90, NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.4, 0.9),
+	NumberSequenceKeypoint.new(0.72, 0.55),
+	NumberSequenceKeypoint.new(1, 0.25),
+}))
+
+local imgScan = New("Frame", {
+	Position = UDim2.new(0, 0, 0, -46),
+	Size = UDim2.new(1, 0, 0, 46),
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 0.9,
+	BorderSizePixel = 0,
+	Rotation = 4,
+	ZIndex = 22,
+	Parent = gameImgHolder,
+})
+uiGradient(imgScan, {
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 120, 150)),
+}, 0, NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.5, 0.65),
+	NumberSequenceKeypoint.new(1, 1),
+}))
+TweenService:Create(imgScan, TweenInfo.new(4.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true, 1.4), {
+	Position = UDim2.new(0, 0, 0, 138),
+}):Play()
+local GameImgTag = New("Frame", {
+	Position = UDim2.new(0, 8, 1, -28),
+	Size = UDim2.new(0, 116, 0, 20),
+	BackgroundColor3 = Color3.fromRGB(10, 1, 3),
+	BackgroundTransparency = 0.25,
+	BorderSizePixel = 0,
+	ZIndex = 23,
+	Parent = gameImgHolder,
+})
+corner(GameImgTag, 8)
+uiStroke(GameImgTag, Color3.fromRGB(255, 90, 115), 1, 0.5)
+label(GameImgTag, {
+	Size = UDim2.new(1, 0, 1, 0),
+	Text = "CURRENT GAME",
+	Font = Enum.Font.GothamBold,
+	TextSize = 9,
+	TextColor3 = Color3.fromRGB(255, 160, 175),
+	TextXAlignment = Enum.TextXAlignment.Center,
+	ZIndex = 24,
+})
+
+local GameName = label(GameCard, {
+	Position = UDim2.new(0, 14, 0, 162),
+	Size = UDim2.new(1, -28, 0, 22),
+	Text = "Loading...",
+	Font = Enum.Font.GothamBold,
+	TextSize = 17,
+	TextTruncate = Enum.TextTruncate.AtEnd,
+	ZIndex = 20,
+})
+label(GameCard, {
+	Position = UDim2.new(0, 14, 0, 186),
+	Size = UDim2.new(1, -28, 0, 14),
+	Text = "Server details & quick copy",
+	TextSize = 10,
+	TextColor3 = C.dim,
+	ZIndex = 20,
+})
+
+local gameRows = {}
+local gameRowFrames = {}
+local function addGameRow(y, icon, caption, value, withCopy, masked)
+	local rf = New("Frame", {
+		Name = "GameRow",
+		Position = UDim2.new(0, 12, 0, y),
+		Size = UDim2.new(1, -24, 0, 34),
+		BackgroundColor3 = Color3.fromRGB(40, 5, 13),
+		BackgroundTransparency = 0.4,
+		BorderSizePixel = 0,
+		ZIndex = 20,
+		Parent = GameCard,
+	})
+	corner(rf, 10)
+	uiStroke(rf, Color3.fromRGB(120, 16, 36), 1, 0.6)
+	iconChip(rf, 6, 7, 20, icon, {z = 21, radius = 6, iconScale = 0.62, tone = "red"})
+	label(rf, {
+		Position = UDim2.new(0, 32, 0, 4),
+		Size = UDim2.new(0, 130, 0, 10),
+		Text = caption,
+		Font = Enum.Font.GothamBold,
+		TextSize = 8,
+		TextColor3 = C.dim,
+		ZIndex = 22,
+	})
+	local val = label(rf, {
+		Position = UDim2.new(0, 32, 0, 14),
+		Size = UDim2.new(1, withCopy and -92 or -38, 0, 15),
+		Text = tostring(value),
+		Font = Enum.Font.Code,
+		TextSize = 11,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 22,
+	})
+	local entry = {labelRef = val, value = tostring(value), hidden = masked == true}
+	if masked then val.Text = maskValue(value) end
+
+	if withCopy then
+		local rowW = gcW - 24
+		local cw = 50
+		local chipX = rowW - cw - 6
+		iconButton(rf, chipX, 5, 24, ICON.copy, function(chip, img)
+			safeSetClipboard(entry.value)
+			flashCopied(img, chip)
+			showToast(LoaderFrame, "Copied  —  " .. entry.value, "success")
+		end, {z = 23, radius = 7, iconScale = 0.6, tone = "green"})
+		local eyeChip, eyeImg = iconButton(rf, chipX + 28, 5, 24, ICON.eye, function(chip, img)
+			entry.hidden = not entry.hidden
+			val.Text = entry.hidden and maskValue(entry.value) or entry.value
+			img.Image = entry.hidden and ICON.eyeOff or ICON.eye
+			showToast(LoaderFrame, entry.hidden and "Value hidden" or "Value revealed", "info")
+		end, {z = 23, radius = 7, iconScale = 0.6, tone = "blue"})
+		if masked then eyeImg.Image = ICON.eyeOff end
+	end
+	table.insert(gameRows, entry)
+	table.insert(gameRowFrames, rf)
+	return entry
+end
+
+local PlaceIdEntry = addGameRow(210, ICON.hash,   "PLACE ID",   game.PlaceId, true, false)
+local PlayerEntry  = addGameRow(250, ICON.users,  "PLAYERS",    #Players:GetPlayers() .. " players", false, false)
+local MaxEntry     = addGameRow(290, ICON.star,   "MAX PLAYERS", maxPlayersText(), false, false)
+maxPlayersRow = MaxEntry
+local JobIdEntry   = addGameRow(330, ICON.server, "JOB ID",     (game.JobId ~= "" and game.JobId or "Unknown"), true, false)
+local ExecEntry    = addGameRow(370, ICON.terminal, "EXECUTOR", getExecutorName(), false, false)
+
+local copyAllBtn, copyAllLbl, copyAllChip = makeButton(GameCard, {
+	x = 12, y = 412, w = gcW - 24, h = 36,
+	text = "Copy all game info", icon = ICON.clipboard,
+	textSize = 12, kind = "ghost", z = 20, radius = 11, iconSize = 24, tone = "green",
+})
+copyAllBtn.MouseButton1Click:Connect(function()
+	local parts = {
+		"PlaceId=" .. game.PlaceId,
+		"JobId=" .. tostring(game.JobId),
+		"Players=" .. #Players:GetPlayers(),
+		"MaxPlayers=" .. tostring(MaxEntry.value),
+		"Executor=" .. ExecEntry.value,
+	}
+	safeSetClipboard(table.concat(parts, " | "))
+	flashCopied(copyAllChip:FindFirstChildOfClass("ImageLabel"), copyAllChip)
+	showToast(LoaderFrame, "Game info copied", "success")
+end)
+
+hDivider(GameCard, 14, 456, gcW - 28, 1, 20)
+
+local miniW = math.floor((gcW - 34) / 2)
+local miniDiscord = makeButton(GameCard, {
+	x = 12, y = 464, w = miniW, h = 34,
+	text = "DISCORD", icon = ICON.message, textSize = 11, kind = "ghost", z = 20, radius = 10, iconSize = 22, tone = "blue",
+})
+local miniKey = makeButton(GameCard, {
+	x = 12 + miniW + 10, y = 464, w = miniW, h = 34,
+	text = "KEY", icon = ICON.key, textSize = 11, kind = "ghost", z = 20, radius = 10, iconSize = 22, tone = "amber",
+})
+linkButton(miniDiscord, DISCORD_LINK, LoaderFrame)
+linkButton(miniKey, KEY_LINK, LoaderFrame)
+
+local scripts = {
+    {name = "Anti-Afk",            url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Anti%20Afk"},
+    {name = "Muscle Legends",       url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Muscle_Legends.txt", placeId = 3623096087},
+    {name = "Legends Of Speed",     url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/legends%20of%20speed.txt", placeId = 3101667897},
+    {name = "Blade Ball",          url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/blade%20ball%20v2.txt", placeId = 13772394625},
+    {name = "Murder Mystery 2",    url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Mm2.txt", placeId = 142823291},
+    {name = "Brook Haven",         url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Brook%20Haven.txt", placeId = 4924922222},
+    {name = "Build A Boat",        url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Build%20A%20Boat.txt", placeId = 537413528},
+    {name = "Escape The Tsunami",  url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Escape%20The%20Tsunami.txt", placeId = 109073199927285},
+    {name = "Lumber Tycoon 2",     url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Lumber%20Tycoon%202.txt", placeId = 13822889},
+    {name = "Natural Disaster",    url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Natural%20disaster.txt", placeId = 189707},
+    {name = "Prison Life",         url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Prison%20Life.txt", placeId = 155615604},
+    {name = "Slap Battles",        url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Slap%20battles.txt", placeId = 6403373529},
+    {name = "Strong Man Simulator", url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Strong%20Man%20Simulator.txt", placeId = 6766156863},
+    {name = "Tower Of Hell",       url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Tower%20Of%20Hell.txt", placeId = 1962086868},
+    {name = "Lifting Simulator",   url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Lifting%20Sim.txt", placeId = 3652625463},
+    {name = "Be A Parkour Ninja",  url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Be%20A%20Parkour%20Ninja.txt", placeId = 147848991},
+    {name = "[FPS] Flick",         url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Fps%20Flick.lua", placeId = 136801880565837},
+    {name = "Broken Bones IV",     url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Broken%20Bones%20IV.lua", placeId = 2551991523},
+    {name = "+1 Money Per Click",  url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/%2B1%20Money%20Per%20Click", placeId = 9488421894},
+    {name = "+1 Spider Arm",       url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/%2B1%20Spider%20Arm", placeId = 10041724213},
+    {name = "Answer Or Die",       url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Answer%20Or%20Die", placeId = 13197779914},
+    {name = "Bloxy Bingo",         url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Bloxy%20Bingo", placeId = 11843231149},
+    {name = "Chess Duels",         url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Chess%20Duels", placeId = 9071536412},
+    {name = "Drill for Eggs",      url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Drill%20for%20Eggs", placeId = 16812836200},
+    {name = "Spelling Bee",        url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Spelling%20Bee", placeId = 11130638520},
+    {name = "Volleyball Legends",  url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Volleyball%20Legends", placeId = 12711047648},
+    {name = "Web Escape",          url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Web%20Escape", placeId = 10183141443},
+    {name = "Rivals",              url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Rivals", placeId = 17625359962},
+    {name = "Steal Animal Egg",    url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Steal%20Animal%20Egg", placeId = 10078028751},
+    {name = "Hide And Seek",       url = "https://raw.githubusercontent.com/kfdjdk72/MORTEUX/refs/heads/main/Hide_And_Seek.txt", placeId = 413349767},
+}
+
+local scriptButtons = {}
+local runningScript = nil
+
+local function executeScript(data)
+	if runningScript then return end
+	runningScript = data
+	local prevSub = LdrSubText
+	setLdrStatus("Running: " .. data.name .. " ...")
+	local ok, err = pcall(function()
+		local src = httpGet(data.url)
+		if not src or src == "" then error("Script could not be downloaded") end
+		local fn = loadstring(src)
+		if not fn then error("loadstring is not supported") end
+		fn()
+	end)
+	if ok then
+		setLdrStatus("Ready - " .. data.name .. " executed")
+	else
+		setLdrStatus("Error - script could not be executed")
+		warn("[Syniox] " .. tostring(err))
+		task.delay(2.6, function()
+			if runningScript == nil then setLdrStatus(prevSub) end
+		end)
+	end
+	runningScript = nil
+	return ok
+end
+
+local function closeLoader()
+	createParticles(LoaderFrame, 22, C.accent)
+	local t = TweenService:Create(LoaderFrame, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, LDR_W + 80, 0, LDR_H + 80),
+	})
+	t:Play()
+	task.delay(0.45, function()
+		ScreenGui:Destroy()
+	end)
+end
+
+local function CreateScriptButton(data, order)
+	local wrap = New("Frame", {
+		Size = UDim2.new(1, 0, 0, 52),
+		LayoutOrder = order,
+		BackgroundColor3 = Color3.fromRGB(38, 5, 13),
+		BackgroundTransparency = 0.25,
+		BorderSizePixel = 0,
+		ZIndex = 19,
+		Parent = ScriptList,
+	})
+	corner(wrap, 11)
+	local wStroke = uiStroke(wrap, Color3.fromRGB(120, 16, 36), 1.2, 0.5)
+
+	local thumbHolder = New("Frame", {
+		Position = UDim2.new(0, 8, 0.5, -17),
+		Size = UDim2.new(0, 34, 0, 34),
+		BackgroundColor3 = Color3.fromRGB(30, 4, 10),
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		ZIndex = 20,
+		Parent = wrap,
+	})
+	corner(thumbHolder, 9)
+	uiStroke(thumbHolder, Color3.fromRGB(150, 30, 55), 1, 0.55)
+	-- ZIndex (Global behavior): holder bg = 20, so the fallback icon must be
+	-- ABOVE 20 but BELOW the thumbnail itself. Otherwise the icon is painted
+	-- behind the holder's background and the box looks completely empty.
+	local thumbFallback = iconChip(thumbHolder, 7, 7, 20, ICON.gamepad, {z = 21, radius = 6, tone = "neutral", iconScale = 0.62})
+	local thumbUri = data.placeId and rbxThumb("GameThumbnail", data.placeId, 256, 144) or nil
+	local thumb = New("ImageLabel", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Image = thumbUri or "",
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+		ScaleType = Enum.ScaleType.Crop,
+		ZIndex = 22,
+		Parent = thumbHolder,
+	})
+
+	local nameLabel = label(wrap, {
+		Position = UDim2.new(0, 52, 0, 9),
+		Size = UDim2.new(1, -140, 0, 17),
+		Text = data.name,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 22,
+	})
+	local subLabel = label(wrap, {
+		Position = UDim2.new(0, 52, 0, 27),
+		Size = UDim2.new(1, -140, 0, 14),
+		Text = data.placeId and ("Place ID: " .. data.placeId) or "Universal script",
+		TextSize = 10,
+		TextColor3 = C.dim,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 22,
+	})
+
+	local wrapW = lstW - 20
+	local playChip, playImg = iconChip(wrap, wrapW - 44, 11, 30, ICON.play, {
+		z = 23, radius = 9, tone = "red",
+	})
+	playChip.Active = false
+
+	local entry = {
+		data = data,
+		frame = wrap,
+		name = data.name,
+		thumb = thumb,
+		thumbUri = thumbUri,
+		thumbFallback = thumbFallback,
+		thumbHolder = thumbHolder,
+		visible = true,
+	}
+
+	local function run()
+		if runningScript then return end
+		playImg.Image = ICON.clock
+		showToast(LoaderFrame, "Running:  " .. data.name, "info")
+		local ok = executeScript(data)
+		playImg.Image = ok and ICON.check or ICON.alert
+		if ok then
+			showToast(LoaderFrame, "Script running  —  " .. data.name, "success")
+			task.delay(0.5, closeLoader)
+		else
+			showToast(LoaderFrame, "Script could not be executed", "error")
+			task.delay(1.4, function()
+				if playImg.Parent then playImg.Image = ICON.play end
+			end)
+		end
+	end
+	entry.run = run
+
+	local clickCatcher = New("TextButton", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 24,
+		Parent = wrap,
+	})
+	clickCatcher.MouseEnter:Connect(function()
+		TweenService:Create(wrap, TweenInfo.new(0.14), {
+			BackgroundColor3 = Color3.fromRGB(56, 7, 18), BackgroundTransparency = 0.05
+		}):Play()
+		TweenService:Create(wStroke, TweenInfo.new(0.14), {Color = C.accent, Transparency = 0.1}):Play()
+	end)
+	clickCatcher.MouseLeave:Connect(function()
+		TweenService:Create(wrap, TweenInfo.new(0.14), {
+			BackgroundColor3 = Color3.fromRGB(38, 5, 13), BackgroundTransparency = 0.25
+		}):Play()
+		TweenService:Create(wStroke, TweenInfo.new(0.14), {Color = Color3.fromRGB(120, 16, 36), Transparency = 0.5}):Play()
+	end)
+	clickCatcher.MouseButton1Click:Connect(function()
+		run()
+		if touchMode then
+			task.delay(0.4, function()
+				if wrap.Parent then
+					TweenService:Create(wrap, TweenInfo.new(0.18), {
+						BackgroundColor3 = Color3.fromRGB(38, 5, 13), BackgroundTransparency = 0.25
+					}):Play()
+					TweenService:Create(wStroke, TweenInfo.new(0.18), {
+						Color = Color3.fromRGB(120, 16, 36), Transparency = 0.5
+					}):Play()
+				end
+			end)
+		end
+	end)
+
+	table.insert(scriptButtons, entry)
+	return entry
+end
+
+for i, data in ipairs(scripts) do
+	CreateScriptButton(data, i)
+end
+
+local function applyFilter()
+	local q = string.lower(SearchBox.Text or "")
+	local shown = 0
+	for _, e in ipairs(scriptButtons) do
+		local match = q == "" or string.find(string.lower(e.name), q, 1, true) ~= nil
+		e.frame.Visible = match
+		e.visible = match
+		if match then shown = shown + 1 end
+	end
+	CountText.Text = shown .. "/" .. #scriptButtons
+end
+SearchBox:GetPropertyChangedSignal("Text"):Connect(applyFilter)
+applyFilter()
+
+local featuredEntry = nil
+for _, e in ipairs(scriptButtons) do
+	if e.data.placeId and e.data.placeId == game.PlaceId then
+		featuredEntry = e
+		break
+	end
+end
+
+if featuredEntry then
+	FeaturedIcon:FindFirstChildOfClass("ImageLabel").Image = ICON.flame
+	FeaturedTitle.Text = featuredEntry.name .. "  - script found"
+	FeaturedSub.Text = "Ready to run in this game - launch it with one click"
+	FeaturedBtn.MouseButton1Click:Connect(function()
+		featuredEntry.run()
+	end)
+	TweenService:Create(FeaturedBox, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 0.05,
+	}):Play()
+else
+	local featIconImg = FeaturedIcon:FindFirstChildOfClass("ImageLabel")
+	featIconImg.Image = ICON.info
+	featIconImg.ImageColor3 = TONE.blue.glyph
+	FeaturedIcon.BackgroundColor3 = TONE.blue.plate
+	FeaturedTitle.Text = "No script found for this game"
+	FeaturedSub.Text = "Pick a universal script from the list or use the search bar"
+	FeaturedBtnLbl.Text = "BROWSE LIST"
+	FeaturedBtn.MouseButton1Click:Connect(function()
+		pcall(function() SearchBox:CaptureFocus() end)
+	end)
+	featStroke.Color = Color3.fromRGB(90, 90, 120)
+end
+
+local currentGameName = nil
+local haveRealName = false
+
+local function setGameName(name)
+	if not name or name == "" or name == currentGameName then return end
+	currentGameName = name
+	if GameName.Parent then
+		GameName.Text = name
+		TweenService:Create(GameName, TweenInfo.new(0.06), {TextColor3 = C.accent}):Play()
+		task.delay(0.55, function()
+			if GameName.Parent then
+				TweenService:Create(GameName, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					TextColor3 = C.text,
+				}):Play()
+			end
+		end)
+	end
+	if runningScript == nil then
+		pcall(setLdrStatus, name .. "  •  " .. #scripts .. " script")
+	end
+end
+
+local function applyGameName()
+	local real = fetchRealName(game.PlaceId)
+	if real then
+		haveRealName = true
+		setGameName(real)
+	elseif haveRealName then
+		return
+	else
+		local localName = game.Name
+		if type(localName) ~= "string" or localName == "" then localName = "Unknown game" end
+		setGameName(localName)
+	end
+end
+
+task.spawn(function()
+	while LoaderFrame.Parent do
+		pcall(applyGameName)
+		task.wait(haveRealName and 45 or 8)
+	end
+end)
+
+task.spawn(function()
+	local fetched = false
+	for attempt = 1, 3 do
+		local uni = decodeJSON(httpGet("https://apis.roblox.com/universes/v1/places/"
+			.. tostring(game.PlaceId) .. "/universe"))
+		local uid = type(uni) == "table" and uni.universeId
+		if uid then
+			local g = decodeJSON(httpGet("https://games.roblox.com/v1/games?universeIds=" .. tostring(uid)))
+			local info = type(g) == "table" and type(g.data) == "table" and g.data[1]
+			if type(info) == "table" and type(info.MaxPlayers) == "number" and info.MaxPlayers > 0 then
+				cachedMaxPlayers = info.MaxPlayers
+				applyMaxPlayers()
+				fetched = true
+				break
+			end
+		end
+		task.wait(2)
+	end
+	if not fetched then
+		pcall(function()
+			if maxPlayersRow then
+				maxPlayersRow.value = "?"
+				local lbl = maxPlayersRow.labelRef
+				if lbl and lbl.Parent then lbl.Text = "?" end
+			end
+		end)
+	end
+end)
+
+task.spawn(function()
+	ExecutorLabel.Text = "Executor: " .. getExecutorName()
+end)
+
+local function localArtworkUrl()
+	local pid = safeGameNumber(function() return game.PlaceId end)
+	if pid then return rbxThumb("GameThumbnail", pid, 768, 432) end
+	local gid = safeGameNumber(function() return game.GameId end)
+	if gid then return rbxThumb("GameIcon", gid, 512, 512) end
+	return nil
+end
+
+task.spawn(function()
+	local url = localArtworkUrl()
+	if not (url and GameImg.Parent) then return end
+	GameImg.ImageTransparency = 1
+	GameImg.ImageColor3 = Color3.fromRGB(255, 255, 255)
+	GameImg.Image = url
+	task.delay(0.4, function()
+		if GameImg.Parent then
+			TweenService:Create(GameImg, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				ImageTransparency = 0,
+			}):Play()
+		end
+	end)
+end)
+
+-- High resolution artwork from the Roblox thumbnails API (GameId = universe id).
+-- Disabled by default: swapping the working rbxthumb placeholder for an external
+-- https url blanks the picture in environments where rbxcdn does not render.
+task.spawn(function()
+	if not USE_REMOTE_THUMBNAILS then return end
+	local gid = safeGameNumber(function() return game.GameId end)
+	if not gid then return end
+	local url = nil
+	for attempt = 1, 3 do
+		local ok, data = pcall(function()
+			return decodeJSON(httpGet("https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds="
+				.. tostring(gid) .. "&countPerUniverse=1&size=768x432&format=Png&filter=TimeWindow&timeWindow=AllTime"))
+		end)
+		if ok and type(data) == "table" and type(data.data) == "table" and type(data.data[1]) == "table"
+			and type(data.data[1].thumbnails) == "table" and type(data.data[1].thumbnails[1]) == "table" then
+			local u = data.data[1].thumbnails[1].imageUrl
+			if type(u) == "string" and u:match("^https://") then
+				url = u
+				break
+			end
+		end
+		task.wait(2)
+	end
+	if url and GameImg.Parent then
+		GameImg.Image = url
+	end
+end)
+
+local function applyThumbImage(entry, url)
+	if type(url) ~= "string" or url == "" then return false end
+	if not url:match("^https://") then return false end
+	if not entry or not entry.thumb or not entry.thumb.Parent then return false end
+	-- Never blank the box: the current image is swapped in place, so if this
+	-- url fails to render we still show what we had (or the fallback icon).
+	entry.thumb.ImageColor3 = Color3.fromRGB(255, 255, 255)
+	entry.thumb.Image = url
+	entry.thumb.ImageTransparency = 0
+	entry.thumbReady = true
+	if entry.thumbFallback then entry.thumbFallback.Visible = false end
+	return true
+end
+
+task.spawn(function()
+	if not USE_REMOTE_THUMBNAILS then
+		-- Keep the local rbxthumb images that are already on every row.
+		warn("[Syniox] remote thumbnails disabled (USE_REMOTE_THUMBNAILS = false)")
+		return
+	end
+	local ids, byPlace = {}, {}
+	for _, e in ipairs(scriptButtons) do
+		if e.data.placeId then
+			local key = tostring(e.data.placeId)
+			if not byPlace[key] then
+				byPlace[key] = e
+				table.insert(ids, key)
+			end
+		end
+	end
+	if #ids == 0 then return end
+
+	local function fetchItems(url)
+		local ok, data = pcall(function()
+			return decodeJSON(httpGet(url))
+		end)
+		if ok and type(data) == "table" and type(data.data) == "table" then
+			return data.data
+		end
+		return nil
+	end
+
+	local function readyCount()
+		local n = 0
+		for _, e in pairs(byPlace) do
+			if e.thumbReady then n = n + 1 end
+		end
+		return n
+	end
+
+	for round = 1, 3 do
+		-- Method 1: batched place game icons
+		if readyCount() < #ids then
+			local items = fetchItems("https://thumbnails.roblox.com/v1/places/gameicons?placeIds="
+				.. table.concat(ids, ",")
+				.. "&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false")
+			if items then
+				for _, item in ipairs(items) do
+					local e = byPlace[tostring(item.targetId or item.placeId)]
+					if e then applyThumbImage(e, item.imageUrl) end
+				end
+			end
+		end
+
+		-- Method 2: resolve universe ids, then batched game icons (per game)
+		if readyCount() < #ids then
+			local uniIds, back = {}, {}
+			for pid, e in pairs(byPlace) do
+				if not e.thumbReady then
+					local ok, uni = pcall(function()
+						return decodeJSON(httpGet("https://apis.roblox.com/universes/v1/places/" .. pid .. "/universe"))
+					end)
+					if ok and type(uni) == "table" and uni.universeId then
+						local uid = tostring(uni.universeId)
+						table.insert(uniIds, uid)
+						back[uid] = pid
+					end
+				end
+			end
+			if #uniIds > 0 then
+				local items = fetchItems("https://thumbnails.roblox.com/v1/games/icons?universeIds="
+					.. table.concat(uniIds, ",")
+					.. "&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false")
+				if items then
+					for _, item in ipairs(items) do
+						local pid = back[tostring(item.targetId)]
+						local e = pid and byPlace[pid]
+						if e then applyThumbImage(e, item.imageUrl) end
+					end
+				end
+			end
+		end
+
+		if readyCount() >= #ids then break end
+		task.wait(2.5)
+	end
+
+	warn("[Syniox] game thumbnails loaded: " .. readyCount() .. "/" .. #ids)
+end)
+
+-- Thumbnail reliability -------------------------------------------------------
+-- 17 rows request their rbxthumb at the same time and some of those requests
+-- fail silently, which leaves a row blank. ContentProvider reports the state of
+-- every image, so only the broken rows are re-requested - rows that already
+-- loaded are never touched (no flicker). Broken rows keep the visible gamepad
+-- fallback icon instead of an empty box.
+local function thumbStatus(uri)
+	local ok, st = pcall(function()
+		return ContentProvider:GetAssetFetchStatus(uri)
+	end)
+	if ok then return st end
+	return nil
+end
+
+local function isBrokenStatus(st)
+	return st == Enum.AssetFetchStatus.Failure or st == Enum.AssetFetchStatus.TimedOut
+end
+
+local function preloadInBackground(uri)
+	task.spawn(function()
+		pcall(function()
+			ContentProvider:PreloadAsync({uri})
+		end)
+	end)
+end
+
+local function resolveGameIconUri(placeId)
+	local ok, uni = pcall(function()
+		return decodeJSON(httpGet("https://apis.roblox.com/universes/v1/places/" .. tostring(placeId) .. "/universe"))
+	end)
+	local uid = ok and type(uni) == "table" and uni.universeId
+	if not uid then return nil end
+	return rbxThumb("GameIcon", tostring(uid), 256, 256)
+end
+
+task.spawn(function()
+	-- probe first: if this executor/client cannot report fetch status, bail out
+	-- and keep the plain behaviour
+	local okProbe = pcall(function()
+		return ContentProvider:GetAssetFetchStatus("rbxassetid://1")
+	end)
+	if not okProbe then return end
+
+	task.wait(2)
+
+	for attempt = 1, 4 do
+		local broken = {}
+		for _, e in ipairs(scriptButtons) do
+			if e.thumbUri and e.thumb and e.thumb.Parent then
+				local st = thumbStatus(e.thumbUri)
+				-- None = no record yet (preload it), or nothing ever happened
+				-- (after a few attempts that counts as broken as well)
+				if isBrokenStatus(st) or (st == Enum.AssetFetchStatus.None and attempt >= 3) then
+					broken[#broken + 1] = e
+				elseif st == Enum.AssetFetchStatus.None then
+					preloadInBackground(e.thumbUri)
+				end
+			end
+		end
+
+		if #broken == 0 then
+			if attempt > 1 then warn("[Syniox] all game thumbnails loaded") end
+			return
+		end
+
+		for _, e in ipairs(broken) do
+			local uri = e.thumbUri
+			-- last attempts: the place thumbnail never arrives, try the game icon
+			if attempt >= 3 then
+				local alt = resolveGameIconUri(e.data.placeId)
+				if alt then
+					local okLoad = pcall(function()
+						ContentProvider:PreloadAsync({alt})
+					end)
+					if okLoad and thumbStatus(alt) == Enum.AssetFetchStatus.Success then
+						uri = alt
+						e.thumbUri = alt
+					end
+				end
+			end
+
+			warn("[Syniox] reloading thumbnail " .. attempt .. "/4: " .. e.name)
+			e.thumb.Image = ""
+			if e.thumbFallback then e.thumbFallback.Visible = true end
+			local target = uri
+			task.defer(function()
+				if e.thumb and e.thumb.Parent then e.thumb.Image = target end
+			end)
+		end
+
+		task.wait(2.5)
+	end
+
+	local left = {}
+	for _, e in ipairs(scriptButtons) do
+		if e.thumbUri and e.thumb and e.thumb.Parent and isBrokenStatus(thumbStatus(e.thumbUri)) then
+			left[#left + 1] = e.name
+		end
+	end
+	if #left > 0 then
+		warn("[Syniox] thumbnails still failing: " .. table.concat(left, ", "))
+	end
+end)
+
+local function refreshPlayerCount()
+	PlayerEntry.labelRef.Text = #Players:GetPlayers() .. " players"
+end
+Players.PlayerAdded:Connect(refreshPlayerCount)
+Players.PlayerRemoving:Connect(refreshPlayerCount)
+
+local function playOpenAnim()
+	LoaderFrame.Visible = true
+	LoaderFrame.Position = UDim2.new(0.5, 0, -0.7, 0)
+	LoaderFrame.BackgroundTransparency = 0.4
+
+	local listBase, gameBase = ListCard.Position, GameCard.Position
+	ListCard.Position = listBase + UDim2.new(0, 0, 0, 54)
+	GameCard.Position = gameBase + UDim2.new(0, 0, 0, 54)
+
+	local restored = {}
+	local okFade = pcall(function()
+		local li = 0
+		for _, e in ipairs(scriptButtons) do
+			if e.frame.Visible then
+				li = li + 1
+				fadeGroup(e.frame, 0.34 + li * 0.045, 0.4)
+			end
+		end
+		for gi, rf in ipairs(gameRowFrames) do
+			fadeGroup(rf, 0.5 + gi * 0.07, 0.42)
+		end
+
+		for _, d in ipairs(LoaderFrame:GetDescendants()) do
+			if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+				local inScriptList = d:IsDescendantOf(ScriptList)
+				local inGameRow = d.Parent and d.Parent.Name == "GameRow"
+				if not inScriptList and not inGameRow then
+					table.insert(restored, {inst = d, tr = d.TextTransparency, sr = d.TextStrokeTransparency})
+					d.TextTransparency = 1
+					d.TextStrokeTransparency = 1
+				end
+			end
+		end
+
+		task.delay(0.12, function()
+			for i, r in ipairs(restored) do
+				if r.inst.Parent then
+					TweenService:Create(r.inst, TweenInfo.new(0.5, Enum.EasingStyle.Quint,
+						Enum.EasingDirection.Out, 0, false, (i % 14) * 0.024), {
+						TextTransparency = r.tr,
+						TextStrokeTransparency = r.sr,
+					}):Play()
+				end
+			end
+		end)
+	end)
+	if not okFade then
+		for _, r in ipairs(restored) do
+			if r.inst.Parent then
+				r.inst.TextTransparency = r.tr
+				r.inst.TextStrokeTransparency = r.sr
+			end
+		end
+		warn("[Syniox] loader entrance fell back to plain state")
+	end
+
+	TweenService:Create(LoaderFrame, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		BackgroundTransparency = 0.1,
+	}):Play()
+	pcall(function()
+		TweenService:Create(loaderFit.comp, TweenInfo.new(0.75, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			Scale = loaderFit.cur,
+		}):Play()
+	end)
+
+	task.delay(0.18, function()
+		if ListCard.Parent then
+			TweenService:Create(ListCard, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				Position = listBase,
+			}):Play()
+		end
+	end)
+	task.delay(0.28, function()
+		if GameCard.Parent then
+			TweenService:Create(GameCard, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				Position = gameBase,
+			}):Play()
+		end
+	end)
+end
+
+local function shakeInput()
+	local base = inputFrame.Position
+	local seq = {10, -10, 7, -7, 4, -4, 0}
+	for i, dx in ipairs(seq) do
+		task.delay((i - 1) * 0.045, function()
+			if inputFrame.Parent then
+				inputFrame.Position = base + UDim2.new(0, dx, 0, 0)
+			end
+		end)
+	end
+end
+
+local verifying = false
+
+local function enterLoader()
+	pcall(function()
+		LoaderFrame.Visible = true
+		LoaderFrame.Position = UDim2.new(0.5, 0, -0.7, 0)
+		LoaderFrame.BackgroundTransparency = 0.4
+		loaderFit.comp.Scale = loaderFit.cur * 0.93
+	end)
+	playOpenAnim()
+end
+
+local function doVerify()
+	if verifying then return end
+
+	local text = normalizeKey(KeyBox.Text)
+
+	if text == "" then
+		pcall(setStatus, "idle")
+		pcall(shakeInput)
+		pcall(showToast, KeyFrame, "Key field is empty", "error")
+		return
+	end
+
+	verifying = true
+	pcall(setStatus, "load")
+
+	task.delay(0.45, function()
+		local okRun, err = pcall(function()
+			if isValidKey(text) then
+				pcall(setStatus, "ok")
+				pcall(saveKeyToFile, text)
+				enterLoader()
+				KeyFrame.Visible = false
+				task.delay(0.65, function()
+					pcall(showToast, LoaderFrame, "Verification successful - welcome " .. tostring(Player.DisplayName), "success")
+					task.delay(2.6, function()
+						pcall(showToast, LoaderFrame, "Key saved - you can skip this screen for " .. KEY_VALID_DAYS .. " days", "info")
+					end)
+				end)
+			else
+				pcall(setStatus, "bad")
+				pcall(shakeInput)
+				pcall(showToast, KeyFrame, "Invalid key, please try again", "error")
+			end
+		end)
+		verifying = false
+		if not okRun then
+			warn("[Syniox] verify error: " .. tostring(err))
+			if isValidKey(text) then
+				pcall(function()
+					LoaderFrame.Visible = true
+					LoaderFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+					LoaderFrame.BackgroundTransparency = 0.1
+					for _, d in ipairs(LoaderFrame:GetDescendants()) do
+						if (d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox"))
+							and d.TextTransparency > 0 then
+							d.TextTransparency = 0
+						end
+					end
+					KeyFrame.Visible = false
+				end)
+			end
+		end
+	end)
+end
+
+verifyBtn.MouseButton1Click:Connect(doVerify)
+KeyBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then doVerify() end
+end)
+
+local function trySavedKeyEntry()
+	local ok, saved = pcall(loadSavedKey)
+	if not (ok and saved) then return false end
+
+	KeyFrame.Visible = false
+	enterLoader()
+
+	task.delay(0.8, function()
+		pcall(showToast, LoaderFrame,
+			"Welcome back - key remembered for " .. KEY_VALID_DAYS .. " days", "success")
+	end)
+	return true
+end
+
+if not trySavedKeyEntry() then
+	KeyFrame.BackgroundTransparency = 1
+	KeyFrame.Position = UDim2.new(0.5, 0, 0.42, 0)
+	pcall(function() keyFit.comp.Scale = keyFit.cur * 0.94 end)
+
+	local profBase = ProfileCard.Position
+	ProfileCard.Position = profBase + UDim2.new(0, 0, 0, 40)
+	for i, rf in ipairs(rowFrames) do
+		fadeGroup(rf, 0.44 + i * 0.07, 0.5)
+	end
+
+	local textFadeIndex = 0
+	for _, d in ipairs(KeyFrame:GetDescendants()) do
+		local inInfoRow = d.Parent and d.Parent.Name == "InfoRow"
+		if (d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox")) and not inInfoRow then
+			local tr, sr = d.TextTransparency, d.TextStrokeTransparency
+			d.TextTransparency = 1
+			d.TextStrokeTransparency = 1
+			textFadeIndex = textFadeIndex + 1
+			local delayT = 0.12 + (textFadeIndex % 12) * 0.022
+			TweenService:Create(d, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, delayT), {
+				TextTransparency = tr,
+				TextStrokeTransparency = sr,
+			}):Play()
+		end
+	end
+	TweenService:Create(KeyFrame, TweenInfo.new(0.75, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		BackgroundTransparency = 0.1,
+	}):Play()
+	pcall(function()
+		TweenService:Create(keyFit.comp, TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			Scale = keyFit.cur,
+		}):Play()
+	end)
+	task.delay(0.32, function()
+		if ProfileCard.Parent then
+			TweenService:Create(ProfileCard, TweenInfo.new(0.65, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				Position = profBase,
+			}):Play()
+		end
+	end)
+	task.delay(0.6, function()
+		pcall(function() KeyBox:CaptureFocus() end)
+	end)
+end
+
+task.spawn(function()
+	while LoaderFrame.Parent do
+		createParticles(LoaderFrame, 3, Color3.fromRGB(255, 70, 100))
+		task.wait(3.5)
+	end
+end)
