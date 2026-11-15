@@ -1913,7 +1913,7 @@ local PETS = {
     },
 }
 
-local MAX_PET_SLOTS = 12
+local MAX_PET_SLOTS = 13
 local TARGET_REP_SPEED = 100
 
 local function unequipConfiguredPets()
@@ -3041,9 +3041,7 @@ Tabs.Boss.Alien = {
 		Phase = "Waiting",
 		PunchInterval = 0.01,
 		LastPunch = 0,
-		EvadeUntil = 0,
-		EvadeDistance = 150,
-		PunchBehindDistance = 35,
+		EvadeDistance = 35,
 		Target = nil
 	}
 }
@@ -3125,40 +3123,27 @@ Tabs.Boss.Alien.getBossHeadPosition = function(model, hitbox)
 	return hitbox.Position + Vector3.new(0, hitbox.Size.Y * 0.35, 0)
 end
 
--- Saldırılardan kaçınma (Dodge) Mekanizması
 Tabs.Boss.Alien.evadeAttack = function(boss, model, hitbox, root)
-	local animator = model:FindFirstChildOfClass("Animator", true) or model:FindFirstChild("AnimationController")
-	if not animator then return end
+	local m1 = model:FindFirstChild("M1Attack")
+	local m2 = model:FindFirstChild("M2Kick")
+	
+	local isAttacking = (m1 and m1.Value) or (m2 and m2.Value)
+	local distanceToBoss = (root.Position - hitbox.Position).Magnitude
 
-	-- Aktif oynatılan animasyonları kontrol et
-	for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-		local animName = string.lower(track.Name)
+	if isAttacking or distanceToBoss < 12 then
+		local center = hitbox.Position
+		local direction = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z)
+		if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
+		direction = direction.Unit
 		
-		-- Eğer M2Kick (Tekme/Ağır saldırı) çalınıyorsa geriye kaç
-		if string.find(animName, "m2kick", 1, true) or string.find(animName, "kick", 1, true) then
-			local center = hitbox.Position
-			local direction = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z).Unit
-			if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
-			local safePosition = center + direction * boss.Data.EvadeDistance + Vector3.new(0, 10, 0)
-			root.CFrame = CFrame.lookAt(safePosition, center)
-			root.AssemblyLinearVelocity = Vector3.zero
-			root.AssemblyAngularVelocity = Vector3.zero
-			boss.StatusLabel.Text = "Status: Dodging Kick"
-			return "Kick"
-		
-		-- Eğer M1Attack çalınıyorsa arkasına geç
-		elseif string.find(animName, "m1attack", 1, true) then
-			local center = Tabs.Boss.Alien.getBossHeadPosition(model, hitbox)
-			local direction = Vector3.new(hitbox.CFrame.LookVector.X, 0, hitbox.CFrame.LookVector.Z)
-			if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
-			local safePosition = center - direction.Unit * boss.Data.PunchBehindDistance
-			root.CFrame = CFrame.lookAt(safePosition, center)
-			root.AssemblyLinearVelocity = Vector3.zero
-			root.AssemblyAngularVelocity = Vector3.zero
-			boss.StatusLabel.Text = "Status: Dodging M1"
-			return "M1"
-		end
+		local safePosition = center + direction * boss.Data.EvadeDistance + Vector3.new(0, 5, 0)
+		root.CFrame = CFrame.lookAt(safePosition, center)
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+		boss.StatusLabel.Text = "Status: Dodging Attack!"
+		return true
 	end
+	return false
 end
 
 Tabs.Boss.Alien.attack = function(target)
@@ -3174,17 +3159,15 @@ Tabs.Boss.Alien.attack = function(target)
 		or target.PrimaryPart or target:FindFirstChild("HumanoidRootPart")
 	if not hitbox or not hitbox:IsA("BasePart") then return end
 
-	-- Kaçınma kontrolü
-	local evadeMode = Tabs.Boss.Alien.evadeAttack(Tabs.Boss.Alien, target, hitbox, root)
-	if evadeMode == "Kick" then return end
+	if Tabs.Boss.Alien.evadeAttack(Tabs.Boss.Alien, target, hitbox, root) then
+		return
+	end
 
 	local punch = char:FindFirstChild("Punch") or PlayerData.Player.Backpack:FindFirstChild("Punch")
 	if punch and punch.Parent ~= char then humanoid:EquipTool(punch) end
 	
-	if evadeMode ~= "M1" then
-		local center = Tabs.Boss.Alien.getBossHeadPosition(target, hitbox)
-		root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
-	end
+	local center = Tabs.Boss.Alien.getBossHeadPosition(target, hitbox)
+	root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
 
