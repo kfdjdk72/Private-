@@ -3077,7 +3077,7 @@ Tabs.Boss:AddSwitch("🎁 Auto Collect Chest", function(state)
     end)
 end)
 
-Tabs.Boss:AddLabel("Syniox On Top")
+Tabs.Boss:AddLabel("Syniox On Top XD")
 Tabs.Boss:AddLabel("")
 Tabs.Boss:AddLabel("👽 Alien Boss Farming").TextSize = 19
 
