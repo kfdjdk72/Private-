@@ -3077,7 +3077,6 @@ Tabs.Boss:AddSwitch("🎁 Auto Collect Chest", function(state)
     end)
 end)
 
-Tabs.Boss:AddLabel("Syniox On Top XD")
 Tabs.Boss:AddLabel("")
 Tabs.Boss:AddLabel("👽 Alien Boss Farming").TextSize = 19
 
@@ -3354,6 +3353,58 @@ Tabs.Boss.Alien.AutoFarmSwitch = Tabs.Boss:AddSwitch("👽 Auto Kill Alien Boss"
 			task.wait(Tabs.Boss.Alien.Data.Target and 0.01 or 0.25)
 		end
 	end, Tabs.Boss.Alien.Data.Generation)
+end)
+
+Tabs.Boss.Alien.AutoCollectSwitch = Tabs.Boss:AddSwitch("🎁 Auto Collect Alien Chest", function(state)
+	Tabs.Boss.Alien.AutoCollectChest = state
+	if not state then return end
+
+	task.spawn(function()
+		while Tabs.Boss.Alien.AutoCollectChest do
+			pcall(function()
+				if not Tabs.Boss.Alien.Data.Target or Tabs.Boss.Alien.getBossHealth(Tabs.Boss.Alien.Data.Target) <= 0 then
+					local chestFolder = Services.Workspace:FindFirstChild("BossChest") or Services.Workspace:FindFirstChild("AlienChest")
+					if chestFolder then
+						local prompt = chestFolder:FindFirstChild("bossChestPrompt", true) or chestFolder:FindFirstChild("ProximityPrompt", true)
+						local chestPart
+
+						if prompt and prompt:IsA("ProximityPrompt") then
+							if prompt.Parent and prompt.Parent:IsA("BasePart") then
+								chestPart = prompt.Parent
+							end
+						end
+
+						if not chestPart then
+							local root = chestFolder:FindFirstChild("Root", true) or chestFolder.PrimaryPart or chestFolder:FindFirstChildWhichIsA("BasePart")
+							if root and root:IsA("BasePart") then
+								chestPart = root
+							end
+						end
+
+						local char = PlayerData.Player.Character
+						local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+						if chestPart and hrp then
+							hrp.CFrame = CFrame.new(
+								chestPart.Position + chestPart.CFrame.RightVector * 3 + Vector3.new(0, 1, 0),
+								chestPart.Position
+							)
+							task.wait(0.15)
+
+							if Tabs.Boss.Alien.AutoCollectChest and (not Tabs.Boss.Alien.Data.Target or Tabs.Boss.Alien.getBossHealth(Tabs.Boss.Alien.Data.Target) <= 0) then
+								Services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+								task.wait(0.5)
+								Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+							end
+						end
+					end
+				end
+			end)
+			task.wait(0.2)
+		end
+
+		Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+	end)
 end)
 
 Tabs.Pets:AddLabel("💰 Auto Buy")
