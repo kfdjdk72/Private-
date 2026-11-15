@@ -3041,7 +3041,9 @@ Tabs.Boss.Alien = {
 		Phase = "Waiting",
 		PunchInterval = 0.01,
 		LastPunch = 0,
-		EvadeDistance = 35,
+		EvadeUntil = 0,
+		EvadeDistance = 120,
+		PunchBehindDistance = 25,
 		Target = nil
 	}
 }
@@ -3124,26 +3126,45 @@ Tabs.Boss.Alien.getBossHeadPosition = function(model, hitbox)
 end
 
 Tabs.Boss.Alien.evadeAttack = function(boss, model, hitbox, root)
-	local m1 = model:FindFirstChild("M1Attack")
-	local m2 = model:FindFirstChild("M2Kick")
-	
-	local isAttacking = (m1 and m1.Value) or (m2 and m2.Value)
-	local distanceToBoss = (root.Position - hitbox.Position).Magnitude
+	local animController = model:FindFirstChildOfClass("AnimationController")
+	local animator = animController and animController:FindFirstChildOfClass("Animator")
+	if not animator then return nil end
 
-	if isAttacking or distanceToBoss < 12 then
-		local center = hitbox.Position
-		local direction = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z)
-		if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
-		direction = direction.Unit
-		
-		local safePosition = center + direction * boss.Data.EvadeDistance + Vector3.new(0, 5, 0)
-		root.CFrame = CFrame.lookAt(safePosition, center)
-		root.AssemblyLinearVelocity = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
-		boss.StatusLabel.Text = "Status: Dodging Attack!"
-		return true
+	local m1Obj = animController:FindFirstChild("M1Attack")
+	local m2Obj = animController:FindFirstChild("M2Kick")
+	local m1Id = m1Obj and m1Obj:IsA("Animation") and m1Obj.AnimationId or ""
+	local m2Id = m2Obj and m2Obj:IsA("Animation") and m2Obj.AnimationId or ""
+
+	for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+		if track.IsPlaying then
+			local trackId = track.Animation and track.Animation.AnimationId or ""
+			local trackName = string.lower(track.Name)
+
+			if (m2Id ~= "" and trackId == m2Id) or string.find(trackName, "m2", 1, true) or string.find(trackName, "kick", 1, true) then
+				local center = hitbox.Position
+				local direction = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z)
+				if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
+				local safePosition = center + direction.Unit * boss.Data.EvadeDistance + Vector3.new(0, 12, 0)
+				root.CFrame = CFrame.lookAt(safePosition, center)
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.AssemblyAngularVelocity = Vector3.zero
+				boss.StatusLabel.Text = "Status: Dodging Kick"
+				return "Kick"
+			elseif (m1Id ~= "" and trackId == m1Id) or string.find(trackName, "m1", 1, true) then
+				local center = Tabs.Boss.Alien.getBossHeadPosition(model, hitbox)
+				local direction = Vector3.new(hitbox.CFrame.LookVector.X, 0, hitbox.CFrame.LookVector.Z)
+				if direction.Magnitude < 1 then direction = Vector3.new(0, 0, 1) end
+				local safePosition = center - direction.Unit * boss.Data.PunchBehindDistance
+				root.CFrame = CFrame.lookAt(safePosition, center)
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.AssemblyAngularVelocity = Vector3.zero
+				boss.StatusLabel.Text = "Status: Dodging M1"
+				return "M1"
+			end
+		end
 	end
-	return false
+
+	return nil
 end
 
 Tabs.Boss.Alien.attack = function(target)
@@ -3159,15 +3180,16 @@ Tabs.Boss.Alien.attack = function(target)
 		or target.PrimaryPart or target:FindFirstChild("HumanoidRootPart")
 	if not hitbox or not hitbox:IsA("BasePart") then return end
 
-	if Tabs.Boss.Alien.evadeAttack(Tabs.Boss.Alien, target, hitbox, root) then
-		return
-	end
+	local evadeMode = Tabs.Boss.Alien.evadeAttack(Tabs.Boss.Alien, target, hitbox, root)
+	if evadeMode == "Kick" then return end
 
 	local punch = char:FindFirstChild("Punch") or PlayerData.Player.Backpack:FindFirstChild("Punch")
 	if punch and punch.Parent ~= char then humanoid:EquipTool(punch) end
 	
-	local center = Tabs.Boss.Alien.getBossHeadPosition(target, hitbox)
-	root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
+	if evadeMode ~= "M1" then
+		local center = Tabs.Boss.Alien.getBossHeadPosition(target, hitbox)
+		root.CFrame = CFrame.lookAt(center, center + hitbox.CFrame.LookVector)
+	end
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
 
