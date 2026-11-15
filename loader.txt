@@ -1802,12 +1802,25 @@ local themeButtonHint = label(LoaderFrame, {
 	TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 30,
 })
 
+local ThemeBackdrop = New("Frame", {
+	Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(3, 1, 8),
+	BackgroundTransparency = 0.18, BorderSizePixel = 0, ZIndex = 68, Visible = true,
+	Parent = ScreenGui,
+})
+uiGradient(ThemeBackdrop, {
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(19, 4, 28)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(5, 2, 15)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 3, 18)),
+}, 35)
+
 local ThemePanel = New("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0),
-	Size = UDim2.new(0, 420, 0, 250), BackgroundColor3 = Color3.fromRGB(15, 5, 13),
-	BackgroundTransparency = 0.04, BorderSizePixel = 0, ZIndex = 70, Visible = false,
-	Parent = LoaderFrame,
+	Size = UDim2.new(0, 620, 0, 360), BackgroundColor3 = Color3.fromRGB(15, 5, 13),
+	BackgroundTransparency = 0.02, BorderSizePixel = 0, ZIndex = 70, Visible = true,
+	Parent = ScreenGui,
 })
+KeyFrame.Visible = false
+LoaderFrame.Visible = false
 corner(ThemePanel, 18)
 uiStroke(ThemePanel, C.accent, 2, 0.15)
 uiGradient(ThemePanel, {
@@ -1824,8 +1837,14 @@ label(ThemePanel, {
 	Text = "Choose an accent to instantly restyle the loader", TextSize = 11,
 	TextColor3 = C.dim, ZIndex = 72,
 })
-local themeClose = iconButton(ThemePanel, 374, 14, 30, ICON.x, function()
+local themeClose = iconButton(ThemePanel, 574, 14, 30, ICON.x, function()
 	ThemePanel.Visible = false
+	ThemeBackdrop.Visible = false
+	KeyFrame.Visible = true
+	KeyFrame.BackgroundTransparency = 1
+	TweenService:Create(KeyFrame, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 0.1,
+	}):Play()
 end, {z = 73, radius = 9, tone = "red"})
 
 local themePresets = {
@@ -1854,19 +1873,26 @@ local function setTheme(preset)
 		button.BackgroundColor3 = button.Name == preset.name and preset.deep or Color3.fromRGB(30, 8, 22)
 	end
 	showToast(LoaderFrame, preset.name .. " theme applied", "success")
+	ThemePanel.Visible = false
+	ThemeBackdrop.Visible = false
+	KeyFrame.Visible = true
+	KeyFrame.BackgroundTransparency = 1
+	TweenService:Create(KeyFrame, TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 0.1,
+	}):Play()
 end
 for i, preset in ipairs(themePresets) do
 	local btn = New("TextButton", {
-		Name = preset.name, Position = UDim2.new(0, 22 + (i - 1) * 76, 0, 92),
-		Size = UDim2.new(0, 68, 0, 90), BackgroundColor3 = Color3.fromRGB(30, 8, 22),
+		Name = preset.name, Position = UDim2.new(0, 28 + (i - 1) * 112, 0, 104),
+		Size = UDim2.new(0, 100, 0, 148), BackgroundColor3 = Color3.fromRGB(30, 8, 22),
 		BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 72, Parent = ThemePanel,
 	})
 	corner(btn, 12)
 	uiStroke(btn, preset.accent, 1.5, 0.25)
-	New("Frame", {Position = UDim2.new(0, 10, 0, 12), Size = UDim2.new(1, -20, 0, 34),
+	New("Frame", {Position = UDim2.new(0, 14, 0, 16), Size = UDim2.new(1, -28, 0, 62),
 		BackgroundColor3 = preset.accent, BorderSizePixel = 0, ZIndex = 73, Parent = btn})
 	corner(btn:FindFirstChildOfClass("Frame"), 10)
-	label(btn, {Position = UDim2.new(0, 2, 0, 54), Size = UDim2.new(1, -4, 0, 20),
+	label(btn, {Position = UDim2.new(0, 2, 0, 94), Size = UDim2.new(1, -4, 0, 28),
 		Text = preset.name, Font = Enum.Font.GothamBold, TextSize = 8,
 		TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = C.sub, ZIndex = 74})
 	btn.MouseButton1Click:Connect(function() setTheme(preset) end)
@@ -1874,12 +1900,7 @@ for i, preset in ipairs(themePresets) do
 end
 themeButton.MouseButton1Click:Connect(function()
 	ThemePanel.Visible = not ThemePanel.Visible
-	if ThemePanel.Visible then
-		ThemePanel.Size = UDim2.new(0, 390, 0, 220)
-		TweenService:Create(ThemePanel, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Size = UDim2.new(0, 420, 0, 250),
-		}):Play()
-	end
+	ThemeBackdrop.Visible = ThemePanel.Visible
 end)
 
 local function setLdrStatus(text)
@@ -3099,7 +3120,9 @@ local function trySavedKeyEntry()
 	return true
 end
 
-if not trySavedKeyEntry() then
+-- Theme selection is always the first screen. The saved key is intentionally
+-- not auto-skipped so the user can review or replace it after choosing a theme.
+if true then
 	KeyFrame.BackgroundTransparency = 1
 	KeyFrame.Position = UDim2.new(0.5, 0, 0.42, 0)
 	pcall(function() keyFit.comp.Scale = keyFit.cur * 0.94 end)
