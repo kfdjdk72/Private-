@@ -1,3 +1,4 @@
+-- Hello Script
 ---------------------------------------------------------------
 -- Syniox Hub Loader  |  v2.0  |  Modern UI
 -- Left info panel removed; profile card + game card added
@@ -1565,6 +1566,7 @@ local StatusText = label(StatusPill, {
 	ZIndex = 23,
 })
 
+local setStatus
 setStatus = function(kind)
 	if kind == "ok" then
 		StatusText.Text = "VERIFIED"
@@ -1591,7 +1593,8 @@ end
 
 hDivider(KeyFrame, rx, 104, rw, 1, 18)
 
-inputFrame = New("Frame", {
+local KeyBox
+local inputFrame = New("Frame", {
 	Position = UDim2.new(0, rx, 0, 120),
 	Size = UDim2.new(0, rw, 0, 62),
 	BackgroundColor3 = Color3.fromRGB(30, 4, 11),
@@ -1763,8 +1766,6 @@ local LdrSubText = LdrSub.Text
 
 -- Loader navigation and theme controls are kept above the content layer so they
 -- remain reachable even when the script list is scrolled.
-local KeyBox
-local setStatus
 local ListCard, GameCard, FeaturedBox, searchFrame
 local function returnToKeyScreen()
 	LoaderFrame.Visible = false
